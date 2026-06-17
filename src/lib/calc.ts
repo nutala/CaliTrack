@@ -145,3 +145,31 @@ export function fmtCompact(n: number): string {
   if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return `${n}`;
 }
+
+// ---------------------------------------------------------------------------
+// Superset helpers
+// ---------------------------------------------------------------------------
+
+/// Distinct colors for superset groups (cycle through chart palette + extras).
+const SUPERSET_COLORS = [
+  "#06b6d4", // cyan
+  "#f59e0b", // amber
+  "#ec4899", // pink
+  "#84cc16", // lime
+  "#8b5cf6", // violet
+  "#ef4444", // red
+  "#14b8a6", // teal
+  "#f97316", // orange
+];
+
+/** Label for a superset group number (1 -> "A", 2 -> "B", ...). */
+export function supersetLabel(group: number | null | undefined): string | null {
+  if (group == null) return null;
+  return String.fromCharCode("A".charCodeAt(0) + ((group - 1) % 26));
+}
+
+/** Hex color for a superset group number. */
+export function supersetColor(group: number | null | undefined): string | null {
+  if (group == null) return null;
+  return SUPERSET_COLORS[(group - 1) % SUPERSET_COLORS.length];
+}

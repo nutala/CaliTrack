@@ -11,6 +11,11 @@ import {
   Timer,
   Weight,
   Gauge,
+  Check,
+  Coffee,
+  Link2,
+  Link2Off,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -20,13 +25,21 @@ import {
   type ExerciseCategory,
   CATEGORY_META,
 } from "@/lib/types";
-import { metricUnit, setMetric, fmtCompact } from "@/lib/calc";
+import { metricUnit, fmtCompact, supersetLabel, supersetColor } from "@/lib/calc";
 import {
   useExercises,
   useCreateWorkout,
+  useWorkouts,
   type NewWorkoutPayload,
 } from "@/hooks/use-data";
 import { useAppStore } from "@/lib/store";
+import {
+  useDraftStore,
+  nextSupersetGroup,
+  type DraftEntry,
+  type DraftSet,
+} from "@/lib/draft-store";
+import { useTimerStore, REST_PRESETS } from "@/lib/timer-store";
 import { EmptyState, SectionHeading } from "@/components/app/common";
 
 import {
@@ -60,41 +73,16 @@ import {
 } from "@/components/ui/command";
 
 // ---------------------------------------------------------------------------
-// Local draft types — transient, never persisted
+// Helpers
 // ---------------------------------------------------------------------------
-type DraftSet = {
-  id: string;
-  reps?: number;
-  holdSeconds?: number;
-  weightKg?: number;
-  rpe?: number;
-};
-
-type DraftEntry = {
-  id: string;
-  exercise: ExerciseWithVariants;
-  variantId: string | null;
-  notes: string;
-  sets: DraftSet[];
-};
-
-/** Stable, dependency-free unique id. */
-function uid(): string {
-  if (
-    typeof crypto !== "undefined" &&
-    typeof crypto.randomUUID === "function"
-  ) {
-    return crypto.randomUUID();
-  }
-  return `id-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
-}
 
 /** Adapter so `setMetric` (which expects the Prisma nullable shape) can read a DraftSet. */
 function draftMetric(set: DraftSet): number {
-  return setMetric({
-    reps: set.reps ?? null,
-    holdSeconds: set.holdSeconds ?? null,
-  });
+  return (
+    set.reps ??
+    set.holdSeconds ??
+    0
+  );
 }
 
 /** Badge classes for perceived exertion (low → mid → high). */
@@ -119,99 +107,52 @@ function sliderAccentClass(value: number): string {
 // Main view
 // ---------------------------------------------------------------------------
 export function NewWorkoutView() {
-  // Workout metadata
-  const [title, setTitle] = React.useState("");
-  const [date, setDate] = React.useState(format(new Date(), "yyyy-MM-dd"));
-  const [durationMin, setDurationMin] = React.useState<number | "">("");
-  const [exertion, setExertion] = React.useState<number>(5);
-  const [bodyweight, setBodyweight] = React.useState<number>(72);
-  const [notes, setNotes] = React.useState("");
-
-  // Entries draft
-  const [entries, setEntries] = React.useState<DraftEntry[]>([]);
-  const [pickerOpen, setPickerOpen] = React.useState(false);
-
-  // Data
+  // Global draft store — persists across view switches.
+  const draft = useDraftStore();
   const exercisesQ = useExercises();
   const exercises = exercisesQ.data ?? [];
+  const workoutsQ = useWorkouts();
   const createWorkout = useCreateWorkout();
 
-  // ----- mutations on draft -----
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+
+  // Resolve exercise objects by id for the draft entries.
+  const exerciseMap = React.useMemo(() => {
+    const m = new Map<string, ExerciseWithVariants>();
+    for (const ex of exercises) m.set(ex.id, ex);
+    return m;
+  }, [exercises]);
+
+  // ----- Consume "Repeat workout" prefill on mount -----
+  const repeatId = useAppStore((s) => s.repeatWorkoutId);
+  const consumeRepeat = useAppStore((s) => s.consumeRepeat);
+  React.useEffect(() => {
+    const id = consumeRepeat();
+    if (!id) return;
+    const workout = workoutsQ.data?.find((w) => w.id === id);
+    if (!workout) {
+      toast.info("Workout data still loading — try again in a moment.");
+      return;
+    }
+    draft.loadFromWorkout(workout, exerciseMap);
+    toast.success(`Loaded "${workout.title || "session"}" — adjust and save.`);
+  }, [repeatId, workoutsQ.data]);
+
+  const { title, date, durationMin, exertion, bodyweight, notes, defaultRestSec, entries } = draft;
+
   function addEntry(exercise: ExerciseWithVariants) {
-    const entry: DraftEntry = {
-      id: uid(),
-      exercise,
-      variantId: null,
-      notes: "",
-      sets: [{ id: uid() }],
-    };
-    setEntries((prev) => [...prev, entry]);
+    draft.addEntry(exercise);
     setPickerOpen(false);
-  }
-
-  function removeEntry(entryId: string) {
-    setEntries((prev) => prev.filter((e) => e.id !== entryId));
-  }
-
-  function updateEntry(entryId: string, patch: Partial<DraftEntry>) {
-    setEntries((prev) =>
-      prev.map((e) => (e.id === entryId ? { ...e, ...patch } : e)),
-    );
-  }
-
-  function addSet(entryId: string) {
-    setEntries((prev) =>
-      prev.map((e) =>
-        e.id === entryId
-          ? { ...e, sets: [...e.sets, { id: uid() }] }
-          : e,
-      ),
-    );
-  }
-
-  function updateSet(
-    entryId: string,
-    setId: string,
-    patch: Partial<DraftSet>,
-  ) {
-    setEntries((prev) =>
-      prev.map((e) =>
-        e.id === entryId
-          ? {
-              ...e,
-              sets: e.sets.map((s) =>
-                s.id === setId ? { ...s, ...patch } : s,
-              ),
-            }
-          : e,
-      ),
-    );
-  }
-
-  function removeSet(entryId: string, setId: string) {
-    setEntries((prev) =>
-      prev.map((e) =>
-        e.id === entryId
-          ? { ...e, sets: e.sets.filter((s) => s.id !== setId) }
-          : e,
-      ),
-    );
-  }
-
-  function resetDraft() {
-    setTitle("");
-    setDate(format(new Date(), "yyyy-MM-dd"));
-    setDurationMin("");
-    setExertion(5);
-    setBodyweight(72);
-    setNotes("");
-    setEntries([]);
   }
 
   // ----- derived totals for the sticky bar -----
   const totalSets = entries.reduce((acc, e) => acc + e.sets.length, 0);
   const totalVolume = entries.reduce(
     (acc, e) => acc + e.sets.reduce((a, s) => a + draftMetric(s), 0),
+    0,
+  );
+  const validatedSets = entries.reduce(
+    (acc, e) => acc + e.sets.filter((s) => s.validated).length,
     0,
   );
 
@@ -223,17 +164,21 @@ export function NewWorkoutView() {
     }
 
     for (const entry of entries) {
+      const ex = exerciseMap.get(entry.exerciseId);
+      if (!ex) {
+        toast.error("One of your exercises could not be found. Remove it and re-add.");
+        return;
+      }
       if (entry.sets.length === 0) {
-        toast.error(`"${entry.exercise.name}" has no sets. Add one or remove the entry.`);
+        toast.error(`"${ex.name}" has no sets. Add one or remove the entry.`);
         return;
       }
       for (const set of entry.sets) {
-        const metric =
-          entry.exercise.isStatic ? set.holdSeconds : set.reps;
+        const metric = ex.isStatic ? set.holdSeconds : set.reps;
         if (metric == null || Number.isNaN(metric)) {
-          const label = entry.exercise.isStatic ? "hold (s)" : "reps";
+          const label = ex.isStatic ? "hold (s)" : "reps";
           toast.error(
-            `Every set on "${entry.exercise.name}" needs a ${label} value.`,
+            `Every set on "${ex.name}" needs a ${label} value.`,
           );
           return;
         }
@@ -253,22 +198,26 @@ export function NewWorkoutView() {
       perceivedExertion: exertion,
       bodyweightKg: bodyweight,
       notes: notes.trim() || undefined,
-      entries: entries.map((e) => ({
-        exerciseId: e.exercise.id,
-        variantId: e.variantId,
-        notes: e.notes.trim() || undefined,
-        sets: e.sets.map((s) => ({
-          reps: e.exercise.isStatic ? undefined : s.reps,
-          holdSeconds: e.exercise.isStatic ? s.holdSeconds : undefined,
-          weightKg: s.weightKg,
-          rpe: s.rpe,
-        })),
-      })),
+      entries: entries.map((e) => {
+        const ex = exerciseMap.get(e.exerciseId)!;
+        return {
+          exerciseId: e.exerciseId,
+          variantId: e.variantId,
+          supersetGroup: e.supersetGroup,
+          notes: e.notes.trim() || undefined,
+          sets: e.sets.map((s) => ({
+            reps: ex.isStatic ? undefined : s.reps,
+            holdSeconds: ex.isStatic ? s.holdSeconds : undefined,
+            weightKg: s.weightKg,
+            rpe: s.rpe,
+          })),
+        };
+      }),
     };
 
     createWorkout.mutate(payload, {
       onSuccess: () => {
-        resetDraft();
+        draft.resetDraft();
         useAppStore.getState().setView("history");
       },
     });
@@ -278,7 +227,7 @@ export function NewWorkoutView() {
     <div className="space-y-6 pb-28">
       <SectionHeading
         title="Log a workout"
-        subtitle="Pick exercises, log sets, and save your session."
+        subtitle="Pick exercises, log sets, run rest timers, and save your session."
       />
 
       {/* ----------------------- Header card ----------------------- */}
@@ -297,7 +246,7 @@ export function NewWorkoutView() {
                 id="nw-title"
                 placeholder="Push & planche focus"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => draft.setMeta("title", e.target.value)}
               />
             </div>
 
@@ -307,7 +256,7 @@ export function NewWorkoutView() {
                 id="nw-date"
                 type="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => draft.setMeta("date", e.target.value)}
                 className="tabular-nums"
               />
             </div>
@@ -322,7 +271,8 @@ export function NewWorkoutView() {
                 placeholder="45"
                 value={durationMin}
                 onChange={(e) =>
-                  setDurationMin(
+                  draft.setMeta(
+                    "durationMin",
                     e.target.value === "" ? "" : Number(e.target.value),
                   )
                 }
@@ -339,7 +289,8 @@ export function NewWorkoutView() {
                 step={0.1}
                 value={bodyweight}
                 onChange={(e) =>
-                  setBodyweight(
+                  draft.setMeta(
+                    "bodyweight",
                     e.target.value === "" ? 0 : Number(e.target.value),
                   )
                 }
@@ -362,7 +313,7 @@ export function NewWorkoutView() {
                 max={10}
                 step={1}
                 value={[exertion]}
-                onValueChange={(v) => setExertion(v[0] ?? 5)}
+                onValueChange={(v) => draft.setMeta("exertion", v[0] ?? 5)}
                 className={cn("mt-2", sliderAccentClass(exertion))}
               />
               <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
@@ -378,9 +329,31 @@ export function NewWorkoutView() {
                 id="nw-notes"
                 placeholder="How did the session feel?"
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(e) => draft.setMeta("notes", e.target.value)}
                 rows={2}
               />
+            </div>
+
+            {/* Default rest duration */}
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="flex items-center gap-1.5">
+                <Coffee className="h-3.5 w-3.5" />
+                Default rest between sets
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {REST_PRESETS.map((p) => (
+                  <Button
+                    key={p.sec}
+                    type="button"
+                    size="sm"
+                    variant={defaultRestSec === p.sec ? "default" : "outline"}
+                    className="h-8 tabular-nums"
+                    onClick={() => draft.setMeta("defaultRestSec", p.sec)}
+                  >
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -392,6 +365,11 @@ export function NewWorkoutView() {
           <h3 className="text-base font-semibold">Exercises</h3>
           <p className="text-sm text-muted-foreground">
             {entries.length} {entries.length === 1 ? "entry" : "entries"}
+            {validatedSets > 0 && (
+              <span className="ml-2 text-emerald-500">
+                · {validatedSets}/{totalSets} sets done
+              </span>
+            )}
           </p>
         </div>
         <Button onClick={() => setPickerOpen(true)}>
@@ -405,7 +383,7 @@ export function NewWorkoutView() {
         <EmptyState
           icon={PlusCircle}
           title="No exercises yet"
-          description="Add your first exercise to start logging sets."
+          description="Add your first exercise to start logging sets. Tip: you can group exercises into supersets and run rest timers between sets."
           action={
             <Button onClick={() => setPickerOpen(true)}>
               <PlusCircle className="h-4 w-4" />
@@ -415,19 +393,56 @@ export function NewWorkoutView() {
         />
       ) : (
         <div className="space-y-4">
-          {entries.map((entry) => (
-            <EntryCard
-              key={entry.id}
-              entry={entry}
-              onChange={(patch) => updateEntry(entry.id, patch)}
-              onRemove={() => removeEntry(entry.id)}
-              onAddSet={() => addSet(entry.id)}
-              onUpdateSet={(setId, patch) =>
-                updateSet(entry.id, setId, patch)
-              }
-              onRemoveSet={(setId) => removeSet(entry.id, setId)}
-            />
-          ))}
+          {entries.map((entry, idx) => {
+            const exercise = exerciseMap.get(entry.exerciseId);
+            if (!exercise) return null;
+            const prevEntry = idx > 0 ? entries[idx - 1] : null;
+            const sameSupersetAsPrev =
+              entry.supersetGroup != null &&
+              prevEntry?.supersetGroup === entry.supersetGroup;
+            return (
+              <EntryCard
+                key={entry.id}
+                entry={entry}
+                exercise={exercise}
+                defaultRestSec={defaultRestSec}
+                supersetCount={entries.filter(
+                  (e) => e.supersetGroup === entry.supersetGroup,
+                ).length}
+                isFirstOfSuperset={
+                  entry.supersetGroup != null &&
+                  !sameSupersetAsPrev
+                }
+                canJoinPrevSuperset={prevEntry?.supersetGroup != null}
+                onChange={(patch) => draft.updateEntry(entry.id, patch)}
+                onRemove={() => draft.removeEntry(entry.id)}
+                onAddSet={() => draft.addSet(entry.id)}
+                onUpdateSet={(setId, patch) =>
+                  draft.updateSet(entry.id, setId, patch)
+                }
+                onRemoveSet={(setId) => draft.removeSet(entry.id, setId)}
+                onValidateSet={(setId, v) =>
+                  draft.validateSet(entry.id, setId, v)
+                }
+                onToggleSuperset={() => {
+                  if (entry.supersetGroup != null) {
+                    // Already in a superset → leave it.
+                    draft.setSuperset(entry.id, null);
+                    return;
+                  }
+                  // Turning on: join the previous entry's superset if it has
+                  // one (natural flow for back-to-back exercises), else start
+                  // a new group.
+                  const prevGroup = prevEntry?.supersetGroup;
+                  if (prevGroup != null) {
+                    draft.setSuperset(entry.id, prevGroup);
+                  } else {
+                    draft.setSuperset(entry.id, nextSupersetGroup(entries));
+                  }
+                }}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -437,9 +452,7 @@ export function NewWorkoutView() {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
             <div className="flex items-center gap-1.5">
               <Dumbbell className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium tabular-nums">
-                {entries.length}
-              </span>
+              <span className="font-medium tabular-nums">{entries.length}</span>
               <span className="text-muted-foreground">entries</span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -447,6 +460,15 @@ export function NewWorkoutView() {
               <span className="font-medium tabular-nums">{totalSets}</span>
               <span className="text-muted-foreground">sets</span>
             </div>
+            {validatedSets > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Check className="h-4 w-4 text-emerald-500" />
+                <span className="font-medium tabular-nums text-emerald-500">
+                  {validatedSets}
+                </span>
+                <span className="text-muted-foreground">done</span>
+              </div>
+            )}
             <div className="flex items-center gap-1.5">
               <Weight className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium tabular-nums">
@@ -491,20 +513,34 @@ export function NewWorkoutView() {
 // ---------------------------------------------------------------------------
 function EntryCard({
   entry,
+  exercise,
+  defaultRestSec,
+  supersetCount,
+  isFirstOfSuperset,
+  canJoinPrevSuperset,
   onChange,
   onRemove,
   onAddSet,
   onUpdateSet,
   onRemoveSet,
+  onValidateSet,
+  onToggleSuperset,
 }: {
   entry: DraftEntry;
+  exercise: ExerciseWithVariants;
+  defaultRestSec: number;
+  supersetCount: number;
+  isFirstOfSuperset: boolean;
+  canJoinPrevSuperset: boolean;
   onChange: (patch: Partial<DraftEntry>) => void;
   onRemove: () => void;
   onAddSet: () => void;
   onUpdateSet: (setId: string, patch: Partial<DraftSet>) => void;
   onRemoveSet: (setId: string) => void;
+  onValidateSet: (setId: string, validated: boolean) => void;
+  onToggleSuperset: () => void;
 }) {
-  const { exercise, variantId, notes, sets } = entry;
+  const { variantId, notes, sets, supersetGroup } = entry;
   const cat = exercise.category as ExerciseCategory;
   const meta = CATEGORY_META[cat] ?? {
     label: cat,
@@ -516,22 +552,32 @@ function EntryCard({
 
   const totalSetsCount = sets.length;
   const totalVolume = sets.reduce((a, s) => a + draftMetric(s), 0);
-  const bestSet = sets.reduce(
-    (m, s) => Math.max(m, draftMetric(s)),
-    0,
-  );
+  const bestSet = sets.reduce((m, s) => Math.max(m, draftMetric(s)), 0);
+  const validatedCount = sets.filter((s) => s.validated).length;
 
   const sortedVariants = exercise.variants
-    ? exercise.variants
-        .slice()
-        .sort((a, b) => a.difficultyLevel - b.difficultyLevel)
+    ? exercise.variants.slice().sort((a, b) => a.difficultyLevel - b.difficultyLevel)
     : [];
 
+  const ssColor = supersetColor(supersetGroup);
+  const ssLabel = supersetLabel(supersetGroup);
+  const inSuperset = supersetGroup != null;
+
   return (
-    <Card>
+    <Card
+      className={cn(
+        "overflow-hidden transition-shadow",
+        inSuperset && "shadow-sm",
+      )}
+      style={
+        inSuperset && ssColor
+          ? { borderLeftColor: ssColor, borderLeftWidth: 4 }
+          : undefined
+      }
+    >
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span aria-hidden className="text-base leading-none">
               {meta.emoji}
             </span>
@@ -551,6 +597,17 @@ function EntryCard({
             {isStatic && (
               <Badge variant="secondary" className="text-[10px]">
                 Hold
+              </Badge>
+            )}
+            {inSuperset && ssColor && ssLabel && (
+              <Badge
+                variant="outline"
+                className="gap-1 border-transparent text-[10px] font-bold"
+                style={{ backgroundColor: `${ssColor}22`, color: ssColor }}
+                title={`Superset ${ssLabel} · ${supersetCount} exercise${supersetCount > 1 ? "s" : ""}`}
+              >
+                <Link2 className="h-3 w-3" />
+                Superset {ssLabel}
               </Badge>
             )}
           </div>
@@ -579,6 +636,37 @@ function EntryCard({
             <Button
               size="icon"
               variant="ghost"
+              className={cn(
+                "h-8 w-8",
+                inSuperset
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-primary",
+              )}
+              onClick={onToggleSuperset}
+              aria-label={
+                inSuperset
+                  ? "Remove from superset"
+                  : canJoinPrevSuperset
+                    ? "Join previous superset"
+                    : "Start a new superset here"
+              }
+              title={
+                inSuperset
+                  ? "Remove from superset"
+                  : canJoinPrevSuperset
+                    ? "Join the previous exercise's superset"
+                    : "Start a new superset"
+              }
+            >
+              {inSuperset ? (
+                <Link2Off className="h-4 w-4" />
+              ) : (
+                <Link2 className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
               onClick={onRemove}
               aria-label={`Remove ${exercise.name}`}
               className="h-8 w-8 text-muted-foreground hover:text-destructive"
@@ -587,6 +675,17 @@ function EntryCard({
             </Button>
           </div>
         </div>
+
+        {/* Superset hint when first of a group */}
+        {isFirstOfSuperset && supersetCount > 1 && ssColor && (
+          <p
+            className="text-xs font-medium"
+            style={{ color: ssColor }}
+          >
+            ↳ Superset {ssLabel}: perform the next{" "}
+            {supersetCount - 1} exercise{supersetCount - 1 > 1 ? "s" : ""} back-to-back without rest.
+          </p>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -607,66 +706,29 @@ function EntryCard({
                 <th className="pb-2 text-left font-medium">{metricLabel}</th>
                 <th className="pb-2 text-left font-medium">Weight (kg)</th>
                 <th className="pb-2 text-left font-medium">RPE</th>
+                <th className="w-20 pb-2 text-center font-medium">Done</th>
+                <th className="w-24 pb-2 text-right font-medium">Rest</th>
                 <th className="w-10 pb-2" />
               </tr>
             </thead>
             <tbody>
               {sets.map((set, idx) => (
-                <tr key={set.id} className="border-t border-border/50">
-                  <td className="py-2 text-muted-foreground tabular-nums">
-                    {idx + 1}
-                  </td>
-                  <td className="py-2 pr-2">
-                    <NumberInput
-                      value={isStatic ? set.holdSeconds : set.reps}
-                      placeholder={isStatic ? "30" : "8"}
-                      aria-label={`${metricLabel} for set ${idx + 1}`}
-                      onChange={(n) =>
-                        onUpdateSet(
-                          set.id,
-                          isStatic ? { holdSeconds: n } : { reps: n },
-                        )
-                      }
-                    />
-                  </td>
-                  <td className="py-2 pr-2">
-                    <NumberInput
-                      value={set.weightKg}
-                      placeholder="0"
-                      step={0.5}
-                      aria-label={`Weight for set ${idx + 1}`}
-                      onChange={(n) =>
-                        onUpdateSet(set.id, { weightKg: n })
-                      }
-                    />
-                  </td>
-                  <td className="py-2 pr-2">
-                    <NumberInput
-                      value={set.rpe}
-                      placeholder="7"
-                      min={1}
-                      max={10}
-                      aria-label={`RPE for set ${idx + 1}`}
-                      onChange={(n) => onUpdateSet(set.id, { rpe: n })}
-                    />
-                  </td>
-                  <td className="py-2">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => onRemoveSet(set.id)}
-                      aria-label={`Delete set ${idx + 1}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </td>
-                </tr>
+                <SetRowDesktop
+                  key={set.id}
+                  set={set}
+                  idx={idx}
+                  isStatic={isStatic}
+                  metricLabel={metricLabel}
+                  defaultRestSec={defaultRestSec}
+                  onUpdate={(patch) => onUpdateSet(set.id, patch)}
+                  onRemove={() => onRemoveSet(set.id)}
+                  onValidate={(v) => onValidateSet(set.id, v)}
+                />
               ))}
               {sets.length === 0 && (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={7}
                     className="py-3 text-center text-xs text-muted-foreground"
                   >
                     No sets yet — add one below.
@@ -680,53 +742,17 @@ function EntryCard({
         {/* Mobile: stacked cards */}
         <div className="space-y-2 sm:hidden">
           {sets.map((set, idx) => (
-            <div
+            <SetRowMobile
               key={set.id}
-              className="rounded-lg border border-border/60 bg-muted/20 p-3"
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground tabular-nums">
-                  Set {idx + 1}
-                </span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                  onClick={() => onRemoveSet(set.id)}
-                  aria-label={`Delete set ${idx + 1}`}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <LabeledNumber
-                  label={metricLabel}
-                  value={isStatic ? set.holdSeconds : set.reps}
-                  placeholder={isStatic ? "30" : "8"}
-                  onChange={(n) =>
-                    onUpdateSet(
-                      set.id,
-                      isStatic ? { holdSeconds: n } : { reps: n },
-                    )
-                  }
-                />
-                <LabeledNumber
-                  label="Weight (kg)"
-                  value={set.weightKg}
-                  placeholder="0"
-                  step={0.5}
-                  onChange={(n) => onUpdateSet(set.id, { weightKg: n })}
-                />
-                <LabeledNumber
-                  label="RPE"
-                  value={set.rpe}
-                  placeholder="7"
-                  min={1}
-                  max={10}
-                  onChange={(n) => onUpdateSet(set.id, { rpe: n })}
-                />
-              </div>
-            </div>
+              set={set}
+              idx={idx}
+              isStatic={isStatic}
+              metricLabel={metricLabel}
+              defaultRestSec={defaultRestSec}
+              onUpdate={(patch) => onUpdateSet(set.id, patch)}
+              onRemove={() => onRemoveSet(set.id)}
+              onValidate={(v) => onValidateSet(set.id, v)}
+            />
           ))}
           {sets.length === 0 && (
             <p className="py-3 text-center text-xs text-muted-foreground">
@@ -764,9 +790,274 @@ function EntryCard({
             </span>{" "}
             {metricUnit(isStatic)}
           </span>
+          {validatedCount > 0 && (
+            <span className="text-emerald-500">
+              <span className="font-medium tabular-nums">{validatedCount}</span> validated
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Set rows
+// ---------------------------------------------------------------------------
+
+function ValidateButton({
+  validated,
+  onClick,
+  label,
+}: {
+  validated: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={validated}
+      className={cn(
+        "inline-flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all",
+        validated
+          ? "border-emerald-500 bg-emerald-500 text-white shadow-sm"
+          : "border-border bg-muted/30 text-muted-foreground hover:border-emerald-500/60 hover:text-emerald-500",
+      )}
+    >
+      <Check className={cn("h-4 w-4", validated && "scale-110")} />
+    </button>
+  );
+}
+
+function RestButton({
+  defaultRestSec,
+  validated,
+}: {
+  defaultRestSec: number;
+  validated: boolean;
+}) {
+  const start = useTimerStore((s) => s.start);
+  const [open, setOpen] = React.useState(false);
+
+  // When the popover is open we show preset buttons; otherwise the main
+  // button starts the default rest timer directly.
+  if (!open) {
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant={validated ? "secondary" : "outline"}
+        className={cn(
+          "h-8 gap-1.5",
+          validated && "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 dark:text-emerald-400",
+        )}
+        onClick={() => start(defaultRestSec)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setOpen(true);
+        }}
+        title="Click to start rest · Right-click for presets"
+      >
+        <Coffee className="h-3.5 w-3.5" />
+        <span className="tabular-nums">{defaultRestSec}s</span>
+      </Button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 rounded-lg border bg-card p-1 shadow-sm">
+      {REST_PRESETS.map((p) => (
+        <Button
+          key={p.sec}
+          type="button"
+          size="sm"
+          variant={p.sec === defaultRestSec ? "default" : "ghost"}
+          className="h-7 tabular-nums"
+          onClick={() => {
+            start(p.sec);
+            setOpen(false);
+          }}
+        >
+          {p.label}
+        </Button>
+      ))}
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="h-7 px-2"
+        onClick={() => setOpen(false)}
+      >
+        ✕
+      </Button>
+    </div>
+  );
+}
+
+function SetRowDesktop({
+  set,
+  idx,
+  isStatic,
+  metricLabel,
+  defaultRestSec,
+  onUpdate,
+  onRemove,
+  onValidate,
+}: {
+  set: DraftSet;
+  idx: number;
+  isStatic: boolean;
+  metricLabel: string;
+  defaultRestSec: number;
+  onUpdate: (patch: Partial<DraftSet>) => void;
+  onRemove: () => void;
+  onValidate: (validated: boolean) => void;
+}) {
+  const validated = set.validated;
+  return (
+    <tr
+      className={cn(
+        "border-t border-border/50 transition-colors",
+        validated && "bg-emerald-500/8",
+      )}
+    >
+      <td className="py-2 text-muted-foreground tabular-nums">{idx + 1}</td>
+      <td className="py-2 pr-2">
+        <NumberInput
+          value={isStatic ? set.holdSeconds : set.reps}
+          placeholder={isStatic ? "30" : "8"}
+          aria-label={`${metricLabel} for set ${idx + 1}`}
+          onChange={(n) =>
+            onUpdate(isStatic ? { holdSeconds: n } : { reps: n })
+          }
+        />
+      </td>
+      <td className="py-2 pr-2">
+        <NumberInput
+          value={set.weightKg}
+          placeholder="0"
+          step={0.5}
+          aria-label={`Weight for set ${idx + 1}`}
+          onChange={(n) => onUpdate({ weightKg: n })}
+        />
+      </td>
+      <td className="py-2 pr-2">
+        <NumberInput
+          value={set.rpe}
+          placeholder="7"
+          min={1}
+          max={10}
+          aria-label={`RPE for set ${idx + 1}`}
+          onChange={(n) => onUpdate({ rpe: n })}
+        />
+      </td>
+      <td className="py-2 text-center">
+        <ValidateButton
+          validated={validated}
+          onClick={() => onValidate(!validated)}
+          label={`Mark set ${idx + 1} as ${validated ? "not done" : "done"}`}
+        />
+      </td>
+      <td className="py-2 text-right">
+        <RestButton defaultRestSec={defaultRestSec} validated={validated} />
+      </td>
+      <td className="py-2">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+          onClick={onRemove}
+          aria-label={`Delete set ${idx + 1}`}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </td>
+    </tr>
+  );
+}
+
+function SetRowMobile({
+  set,
+  idx,
+  isStatic,
+  metricLabel,
+  defaultRestSec,
+  onUpdate,
+  onRemove,
+  onValidate,
+}: {
+  set: DraftSet;
+  idx: number;
+  isStatic: boolean;
+  metricLabel: string;
+  defaultRestSec: number;
+  onUpdate: (patch: Partial<DraftSet>) => void;
+  onRemove: () => void;
+  onValidate: (validated: boolean) => void;
+}) {
+  const validated = set.validated;
+  return (
+    <div
+      className={cn(
+        "rounded-lg border-2 bg-muted/20 p-3 transition-colors",
+        validated
+          ? "border-emerald-500/60 bg-emerald-500/10"
+          : "border-border/60",
+      )}
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground tabular-nums">
+          Set {idx + 1}
+        </span>
+        <div className="flex items-center gap-1">
+          <ValidateButton
+            validated={validated}
+            onClick={() => onValidate(!validated)}
+            label={`Mark set ${idx + 1} as ${validated ? "not done" : "done"}`}
+          />
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+            onClick={onRemove}
+            aria-label={`Delete set ${idx + 1}`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <LabeledNumber
+          label={metricLabel}
+          value={isStatic ? set.holdSeconds : set.reps}
+          placeholder={isStatic ? "30" : "8"}
+          onChange={(n) =>
+            onUpdate(isStatic ? { holdSeconds: n } : { reps: n })
+          }
+        />
+        <LabeledNumber
+          label="Weight (kg)"
+          value={set.weightKg}
+          placeholder="0"
+          step={0.5}
+          onChange={(n) => onUpdate({ weightKg: n })}
+        />
+        <LabeledNumber
+          label="RPE"
+          value={set.rpe}
+          placeholder="7"
+          min={1}
+          max={10}
+          onChange={(n) => onUpdate({ rpe: n })}
+        />
+      </div>
+      <div className="mt-2 flex justify-end">
+        <RestButton defaultRestSec={defaultRestSec} validated={validated} />
+      </div>
+    </div>
   );
 }
 
@@ -928,10 +1219,7 @@ function ExercisePickerDialog({
                     </span>
                     <span className="flex-1 truncate">{ex.name}</span>
                     {ex.isStatic && (
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px]"
-                      >
+                      <Badge variant="secondary" className="text-[10px]">
                         Hold
                       </Badge>
                     )}

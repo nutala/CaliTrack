@@ -171,3 +171,32 @@ Stage Summary:
 - Golden path (log workout → see it in history → see updated dashboard stats) works with real data flow through REST API + Prisma + TanStack Query cache invalidation.
 - Responsive (mobile-first) + sticky footer + dark-mode default all confirmed.
 - Production-ready: clean lint, clean compile, no runtime errors.
+
+---
+Task ID: 7
+Agent: main orchestrator
+Task: Add 4 session-oriented features: rest timer, validated sets, repeat workout, supersets
+
+Work Log:
+- DB: Added `supersetGroup Int?` to WorkoutEntry model, ran db:push + db:generate.
+- API: Updated POST /api/workouts to accept and persist supersetGroup per entry. Updated NewWorkoutPayload type.
+- Stores: Created global `useTimerStore` (rest timer with timestamp-based countdown, pause/resume/skip/+15s). Created global `useWorkoutDraftStore` (draft persists across view switches — essential for in-session rest timer usage). Added `repeatWorkout`/`consumeRepeat` to `useAppStore` for the Repeat feature.
+- calc.ts: Added `supersetLabel()` (1→"A", 2→"B"...) and `supersetColor()` (8-color palette) helpers.
+- RestTimerWidget: Floating component in AppShell (persists across views). Circular SVG countdown, beep on completion (Web Audio API), toast notification. Controls: Pause/Resume, +15s, Skip, Dismiss. Color shifts to amber under 10s, emerald on completion.
+- NewWorkoutView rewrite: Now uses global draft store. Added: (1) Validated sets — green check toggle per set with emerald border/background when done, "X/Y sets done" counter in header and save bar. (2) Rest button per set — click starts default timer, right-click opens preset picker (30s/1m/1m30/2m/3m). (3) Superset grouping — Link2 toggle per entry; clicking on a subsequent entry auto-joins the previous entry's superset; colored left border + "Superset A" badge + hint text "perform next N exercises back-to-back". (4) Repeat prefill consumption on mount. (5) Default rest duration selector in session header.
+- HistoryView: Added "Repeat workout" action in overflow menu (calls repeatWorkout → navigates to New Workout with prefill). Added superset badges (colored "Superset A" badge + colored left border) in expanded entry detail.
+- db.ts: Added SCHEMA_VERSION pattern to force new PrismaClient instance on schema change (avoids stale global singleton caching the old field definitions).
+- Dev server restart: Had to restart after clearing .next cache (Turbopack corruption). Used `setsid -f` for persistent background process.
+
+Verification (Agent Browser):
+- Created Pull-up + Dip superset: Pull-up → "Start a new superset" → "Superset A"; Dip → "Join previous superset" → joined group A with hint "perform next 1 exercise back-to-back without rest". ✓
+- Filled reps (10, 12), validated both sets (green checks appeared, "2/2 sets done" in save bar). ✓
+- Started 90s rest timer from set row → floating widget appeared (89s countdown, circular progress). Tested Pause (froze at 69s), +15s (69→84s, total 90→105s), Skip (dismissed). ✓
+- Saved workout "Push+Pull Superset" → POST 201 → redirected to History. ✓
+- Expanded workout in History → both entries show "Superset A" badge with colored border. ✓
+- Clicked "Repeat workout" on a past session → New Workout view loaded with "(repeat)" title suffix, all 3 entries pre-filled with exercises/variants/sets. ✓
+- Lint: 0 errors, 0 warnings. ✓
+
+Stage Summary:
+- All 4 features working end-to-end: rest timer (global, floating, with beep), validated sets (green check + border), repeat workout (pre-fills draft from history), supersets (DB-persisted, colored grouping, auto-join UX).
+- Draft now persists across view switches via global store — users can check dashboard/history mid-session without losing their workout.

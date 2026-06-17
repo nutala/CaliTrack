@@ -1,0 +1,948 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import * as React from "react";
+     4→     4→import { format } from "date-fns";
+     5→     5→import {
+     6→     6→  PlusCircle,
+     7→     7→  Plus,
+     8→     8→  Trash2,
+     9→     9→  Dumbbell,
+    10→    10→  Save,
+    11→    11→  Timer,
+    12→    12→  Weight,
+    13→    13→  Gauge,
+    14→    14→} from "lucide-react";
+    15→    15→import { toast } from "sonner";
+    16→    16→
+    17→    17→import { cn } from "@/lib/utils";
+    18→    18→import {
+    19→    19→  type ExerciseWithVariants,
+    20→    20→  type ExerciseCategory,
+    21→    21→  CATEGORY_META,
+    22→    22→} from "@/lib/types";
+    23→    23→import { metricUnit, setMetric, fmtCompact } from "@/lib/calc";
+    24→    24→import {
+    25→    25→  useExercises,
+    26→    26→  useCreateWorkout,
+    27→    27→  type NewWorkoutPayload,
+    28→    28→} from "@/hooks/use-data";
+    29→    29→import { useAppStore } from "@/lib/store";
+    30→    30→import { EmptyState, SectionHeading } from "@/components/app/common";
+    31→    31→
+    32→    32→import {
+    33→    33→  Card,
+    34→    34→  CardContent,
+    35→    35→  CardHeader,
+    36→    36→  CardTitle,
+    37→    37→} from "@/components/ui/card";
+    38→    38→import { Button } from "@/components/ui/button";
+    39→    39→import { Input } from "@/components/ui/input";
+    40→    40→import { Textarea } from "@/components/ui/textarea";
+    41→    41→import {
+    42→    42→  Select,
+    43→    43→  SelectContent,
+    44→    44→  SelectItem,
+    45→    45→  SelectTrigger,
+    46→    46→  SelectValue,
+    47→    47→} from "@/components/ui/select";
+    48→    48→import { Slider } from "@/components/ui/slider";
+    49→    49→import { Label } from "@/components/ui/label";
+    50→    50→import { Badge } from "@/components/ui/badge";
+    51→    51→import { Separator } from "@/components/ui/separator";
+    52→    52→import {
+    53→    53→  Command,
+    54→    54→  CommandDialog,
+    55→    55→  CommandEmpty,
+    56→    56→  CommandGroup,
+    57→    57→  CommandInput,
+    58→    58→  CommandItem,
+    59→    59→  CommandList,
+    60→    60→} from "@/components/ui/command";
+    61→    61→
+    62→    62→// ---------------------------------------------------------------------------
+    63→    63→// Local draft types — transient, never persisted
+    64→    64→// ---------------------------------------------------------------------------
+    65→    65→type DraftSet = {
+    66→    66→  id: string;
+    67→    67→  reps?: number;
+    68→    68→  holdSeconds?: number;
+    69→    69→  weightKg?: number;
+    70→    70→  rpe?: number;
+    71→    71→};
+    72→    72→
+    73→    73→type DraftEntry = {
+    74→    74→  id: string;
+    75→    75→  exercise: ExerciseWithVariants;
+    76→    76→  variantId: string | null;
+    77→    77→  notes: string;
+    78→    78→  sets: DraftSet[];
+    79→    79→};
+    80→    80→
+    81→    81→/** Stable, dependency-free unique id. */
+    82→    82→function uid(): string {
+    83→    83→  if (
+    84→    84→    typeof crypto !== "undefined" &&
+    85→    85→    typeof crypto.randomUUID === "function"
+    86→    86→  ) {
+    87→    87→    return crypto.randomUUID();
+    88→    88→  }
+    89→    89→  return `id-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
+    90→    90→}
+    91→    91→
+    92→    92→/** Adapter so `setMetric` (which expects the Prisma nullable shape) can read a DraftSet. */
+    93→    93→function draftMetric(set: DraftSet): number {
+    94→    94→  return setMetric({
+    95→    95→    reps: set.reps ?? null,
+    96→    96→    holdSeconds: set.holdSeconds ?? null,
+    97→    97→  });
+    98→    98→}
+    99→    99→
+   100→   100→/** Badge classes for perceived exertion (low → mid → high). */
+   101→   101→function exertionBadgeClass(value: number): string {
+   102→   102→  if (value <= 3)
+   103→   103→    return "border-emerald-500/30 bg-emerald-500/15 text-emerald-500";
+   104→   104→  if (value <= 6)
+   105→   105→    return "border-amber-500/30 bg-amber-500/15 text-amber-500";
+   106→   106→  return "border-red-500/30 bg-red-500/15 text-red-500";
+   107→   107→}
+   108→   108→
+   109→   109→/** Slider range/thumb color override via descendant selectors. */
+   110→   110→function sliderAccentClass(value: number): string {
+   111→   111→  if (value <= 3)
+   112→   112→    return "[&_[data-slot=slider-range]]:bg-emerald-500 [&_[data-slot=slider-thumb]]:border-emerald-500";
+   113→   113→  if (value <= 6)
+   114→   114→    return "[&_[data-slot=slider-range]]:bg-amber-500 [&_[data-slot=slider-thumb]]:border-amber-500";
+   115→   115→  return "[&_[data-slot=slider-range]]:bg-red-500 [&_[data-slot=slider-thumb]]:border-red-500";
+   116→   116→}
+   117→   117→
+   118→   118→// ---------------------------------------------------------------------------
+   119→   119→// Main view
+   120→   120→// ---------------------------------------------------------------------------
+   121→   121→export function NewWorkoutView() {
+   122→   122→  // Workout metadata
+   123→   123→  const [title, setTitle] = React.useState("");
+   124→   124→  const [date, setDate] = React.useState(format(new Date(), "yyyy-MM-dd"));
+   125→   125→  const [durationMin, setDurationMin] = React.useState<number | "">("");
+   126→   126→  const [exertion, setExertion] = React.useState<number>(5);
+   127→   127→  const [bodyweight, setBodyweight] = React.useState<number>(72);
+   128→   128→  const [notes, setNotes] = React.useState("");
+   129→   129→
+   130→   130→  // Entries draft
+   131→   131→  const [entries, setEntries] = React.useState<DraftEntry[]>([]);
+   132→   132→  const [pickerOpen, setPickerOpen] = React.useState(false);
+   133→   133→
+   134→   134→  // Data
+   135→   135→  const exercisesQ = useExercises();
+   136→   136→  const exercises = exercisesQ.data ?? [];
+   137→   137→  const createWorkout = useCreateWorkout();
+   138→   138→
+   139→   139→  // ----- mutations on draft -----
+   140→   140→  function addEntry(exercise: ExerciseWithVariants) {
+   141→   141→    const entry: DraftEntry = {
+   142→   142→      id: uid(),
+   143→   143→      exercise,
+   144→   144→      variantId: null,
+   145→   145→      notes: "",
+   146→   146→      sets: [{ id: uid() }],
+   147→   147→    };
+   148→   148→    setEntries((prev) => [...prev, entry]);
+   149→   149→    setPickerOpen(false);
+   150→   150→  }
+   151→   151→
+   152→   152→  function removeEntry(entryId: string) {
+   153→   153→    setEntries((prev) => prev.filter((e) => e.id !== entryId));
+   154→   154→  }
+   155→   155→
+   156→   156→  function updateEntry(entryId: string, patch: Partial<DraftEntry>) {
+   157→   157→    setEntries((prev) =>
+   158→   158→      prev.map((e) => (e.id === entryId ? { ...e, ...patch } : e)),
+   159→   159→    );
+   160→   160→  }
+   161→   161→
+   162→   162→  function addSet(entryId: string) {
+   163→   163→    setEntries((prev) =>
+   164→   164→      prev.map((e) =>
+   165→   165→        e.id === entryId
+   166→   166→          ? { ...e, sets: [...e.sets, { id: uid() }] }
+   167→   167→          : e,
+   168→   168→      ),
+   169→   169→    );
+   170→   170→  }
+   171→   171→
+   172→   172→  function updateSet(
+   173→   173→    entryId: string,
+   174→   174→    setId: string,
+   175→   175→    patch: Partial<DraftSet>,
+   176→   176→  ) {
+   177→   177→    setEntries((prev) =>
+   178→   178→      prev.map((e) =>
+   179→   179→        e.id === entryId
+   180→   180→          ? {
+   181→   181→              ...e,
+   182→   182→              sets: e.sets.map((s) =>
+   183→   183→                s.id === setId ? { ...s, ...patch } : s,
+   184→   184→              ),
+   185→   185→            }
+   186→   186→          : e,
+   187→   187→      ),
+   188→   188→    );
+   189→   189→  }
+   190→   190→
+   191→   191→  function removeSet(entryId: string, setId: string) {
+   192→   192→    setEntries((prev) =>
+   193→   193→      prev.map((e) =>
+   194→   194→        e.id === entryId
+   195→   195→          ? { ...e, sets: e.sets.filter((s) => s.id !== setId) }
+   196→   196→          : e,
+   197→   197→      ),
+   198→   198→    );
+   199→   199→  }
+   200→   200→
+   201→   201→  function resetDraft() {
+   202→   202→    setTitle("");
+   203→   203→    setDate(format(new Date(), "yyyy-MM-dd"));
+   204→   204→    setDurationMin("");
+   205→   205→    setExertion(5);
+   206→   206→    setBodyweight(72);
+   207→   207→    setNotes("");
+   208→   208→    setEntries([]);
+   209→   209→  }
+   210→   210→
+   211→   211→  // ----- derived totals for the sticky bar -----
+   212→   212→  const totalSets = entries.reduce((acc, e) => acc + e.sets.length, 0);
+   213→   213→  const totalVolume = entries.reduce(
+   214→   214→    (acc, e) => acc + e.sets.reduce((a, s) => a + draftMetric(s), 0),
+   215→   215→    0,
+   216→   216→  );
+   217→   217→
+   218→   218→  // ----- save handler -----
+   219→   219→  function handleSave() {
+   220→   220→    if (entries.length === 0) {
+   221→   221→      toast.error("Add at least one exercise before saving.");
+   222→   222→      return;
+   223→   223→    }
+   224→   224→
+   225→   225→    for (const entry of entries) {
+   226→   226→      if (entry.sets.length === 0) {
+   227→   227→        toast.error(`"${entry.exercise.name}" has no sets. Add one or remove the entry.`);
+   228→   228→        return;
+   229→   229→      }
+   230→   230→      for (const set of entry.sets) {
+   231→   231→        const metric =
+   232→   232→          entry.exercise.isStatic ? set.holdSeconds : set.reps;
+   233→   233→        if (metric == null || Number.isNaN(metric)) {
+   234→   234→          const label = entry.exercise.isStatic ? "hold (s)" : "reps";
+   235→   235→          toast.error(
+   236→   236→            `Every set on "${entry.exercise.name}" needs a ${label} value.`,
+   237→   237→          );
+   238→   238→          return;
+   239→   239→        }
+   240→   240→      }
+   241→   241→    }
+   242→   242→
+   243→   243→    // Build ISO date at local midnight
+   244→   244→    const isoDate = new Date(`${date}T00:00:00`).toISOString();
+   245→   245→
+   246→   246→    const payload: NewWorkoutPayload = {
+   247→   247→      date: isoDate,
+   248→   248→      title: title.trim() || undefined,
+   249→   249→      durationMin:
+   250→   250→        typeof durationMin === "number" && !Number.isNaN(durationMin)
+   251→   251→          ? durationMin
+   252→   252→          : undefined,
+   253→   253→      perceivedExertion: exertion,
+   254→   254→      bodyweightKg: bodyweight,
+   255→   255→      notes: notes.trim() || undefined,
+   256→   256→      entries: entries.map((e) => ({
+   257→   257→        exerciseId: e.exercise.id,
+   258→   258→        variantId: e.variantId,
+   259→   259→        notes: e.notes.trim() || undefined,
+   260→   260→        sets: e.sets.map((s) => ({
+   261→   261→          reps: e.exercise.isStatic ? undefined : s.reps,
+   262→   262→          holdSeconds: e.exercise.isStatic ? s.holdSeconds : undefined,
+   263→   263→          weightKg: s.weightKg,
+   264→   264→          rpe: s.rpe,
+   265→   265→        })),
+   266→   266→      })),
+   267→   267→    };
+   268→   268→
+   269→   269→    createWorkout.mutate(payload, {
+   270→   270→      onSuccess: () => {
+   271→   271→        resetDraft();
+   272→   272→        useAppStore.getState().setView("history");
+   273→   273→      },
+   274→   274→    });
+   275→   275→  }
+   276→   276→
+   277→   277→  return (
+   278→   278→    <div className="space-y-6 pb-28">
+   279→   279→      <SectionHeading
+   280→   280→        title="Log a workout"
+   281→   281→        subtitle="Pick exercises, log sets, and save your session."
+   282→   282→      />
+   283→   283→
+   284→   284→      {/* ----------------------- Header card ----------------------- */}
+   285→   285→      <Card>
+   286→   286→        <CardHeader>
+   287→   287→          <CardTitle className="flex items-center gap-2 text-base">
+   288→   288→            <Gauge className="h-4 w-4 text-muted-foreground" />
+   289→   289→            Session details
+   290→   290→          </CardTitle>
+   291→   291→        </CardHeader>
+   292→   292→        <CardContent>
+   293→   293→          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+   294→   294→            <div className="space-y-1.5">
+   295→   295→              <Label htmlFor="nw-title">Title</Label>
+   296→   296→              <Input
+   297→   297→                id="nw-title"
+   298→   298→                placeholder="Push & planche focus"
+   299→   299→                value={title}
+   300→   300→                onChange={(e) => setTitle(e.target.value)}
+   301→   301→              />
+   302→   302→            </div>
+   303→   303→
+   304→   304→            <div className="space-y-1.5">
+   305→   305→              <Label htmlFor="nw-date">Date</Label>
+   306→   306→              <Input
+   307→   307→                id="nw-date"
+   308→   308→                type="date"
+   309→   309→                value={date}
+   310→   310→                onChange={(e) => setDate(e.target.value)}
+   311→   311→                className="tabular-nums"
+   312→   312→              />
+   313→   313→            </div>
+   314→   314→
+   315→   315→            <div className="space-y-1.5">
+   316→   316→              <Label htmlFor="nw-duration">Duration (min)</Label>
+   317→   317→              <Input
+   318→   318→                id="nw-duration"
+   319→   319→                type="number"
+   320→   320→                inputMode="numeric"
+   321→   321→                min={0}
+   322→   322→                placeholder="45"
+   323→   323→                value={durationMin}
+   324→   324→                onChange={(e) =>
+   325→   325→                  setDurationMin(
+   326→   326→                    e.target.value === "" ? "" : Number(e.target.value),
+   327→   327→                  )
+   328→   328→                }
+   329→   329→                className="tabular-nums"
+   330→   330→              />
+   331→   331→            </div>
+   332→   332→
+   333→   333→            <div className="space-y-1.5">
+   334→   334→              <Label htmlFor="nw-bw">Bodyweight (kg)</Label>
+   335→   335→              <Input
+   336→   336→                id="nw-bw"
+   337→   337→                type="number"
+   338→   338→                inputMode="decimal"
+   339→   339→                step={0.1}
+   340→   340→                value={bodyweight}
+   341→   341→                onChange={(e) =>
+   342→   342→                  setBodyweight(
+   343→   343→                    e.target.value === "" ? 0 : Number(e.target.value),
+   344→   344→                  )
+   345→   345→                }
+   346→   346→                className="tabular-nums"
+   347→   347→              />
+   348→   348→            </div>
+   349→   349→
+   350→   350→            <div className="space-y-2 sm:col-span-2">
+   351→   351→              <div className="flex items-center justify-between">
+   352→   352→                <Label>Perceived exertion</Label>
+   353→   353→                <Badge
+   354→   354→                  variant="outline"
+   355→   355→                  className={cn("tabular-nums", exertionBadgeClass(exertion))}
+   356→   356→                >
+   357→   357→                  {exertion}/10
+   358→   358→                </Badge>
+   359→   359→              </div>
+   360→   360→              <Slider
+   361→   361→                min={1}
+   362→   362→                max={10}
+   363→   363→                step={1}
+   364→   364→                value={[exertion]}
+   365→   365→                onValueChange={(v) => setExertion(v[0] ?? 5)}
+   366→   366→                className={cn("mt-2", sliderAccentClass(exertion))}
+   367→   367→              />
+   368→   368→              <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
+   369→   369→                <span>1 Easy</span>
+   370→   370→                <span>5 Moderate</span>
+   371→   371→                <span>10 Max</span>
+   372→   372→              </div>
+   373→   373→            </div>
+   374→   374→
+   375→   375→            <div className="space-y-1.5 sm:col-span-2">
+   376→   376→              <Label htmlFor="nw-notes">Notes</Label>
+   377→   377→              <Textarea
+   378→   378→                id="nw-notes"
+   379→   379→                placeholder="How did the session feel?"
+   380→   380→                value={notes}
+   381→   381→                onChange={(e) => setNotes(e.target.value)}
+   382→   382→                rows={2}
+   383→   383→              />
+   384→   384→            </div>
+   385→   385→          </div>
+   386→   386→        </CardContent>
+   387→   387→      </Card>
+   388→   388→
+   389→   389→      {/* ----------------------- Exercise picker trigger ----------------------- */}
+   390→   390→      <div className="flex items-center justify-between gap-3">
+   391→   391→        <div>
+   392→   392→          <h3 className="text-base font-semibold">Exercises</h3>
+   393→   393→          <p className="text-sm text-muted-foreground">
+   394→   394→            {entries.length} {entries.length === 1 ? "entry" : "entries"}
+   395→   395→          </p>
+   396→   396→        </div>
+   397→   397→        <Button onClick={() => setPickerOpen(true)}>
+   398→   398→          <PlusCircle className="h-4 w-4" />
+   399→   399→          Add Exercise
+   400→   400→        </Button>
+   401→   401→      </div>
+   402→   402→
+   403→   403→      {/* ----------------------- Entries list ----------------------- */}
+   404→   404→      {entries.length === 0 ? (
+   405→   405→        <EmptyState
+   406→   406→          icon={PlusCircle}
+   407→   407→          title="No exercises yet"
+   408→   408→          description="Add your first exercise to start logging sets."
+   409→   409→          action={
+   410→   410→            <Button onClick={() => setPickerOpen(true)}>
+   411→   411→              <PlusCircle className="h-4 w-4" />
+   412→   412→              Add Exercise
+   413→   413→            </Button>
+   414→   414→          }
+   415→   415→        />
+   416→   416→      ) : (
+   417→   417→        <div className="space-y-4">
+   418→   418→          {entries.map((entry) => (
+   419→   419→            <EntryCard
+   420→   420→              key={entry.id}
+   421→   421→              entry={entry}
+   422→   422→              onChange={(patch) => updateEntry(entry.id, patch)}
+   423→   423→              onRemove={() => removeEntry(entry.id)}
+   424→   424→              onAddSet={() => addSet(entry.id)}
+   425→   425→              onUpdateSet={(setId, patch) =>
+   426→   426→                updateSet(entry.id, setId, patch)
+   427→   427→              }
+   428→   428→              onRemoveSet={(setId) => removeSet(entry.id, setId)}
+   429→   429→            />
+   430→   430→          ))}
+   431→   431→        </div>
+   432→   432→      )}
+   433→   433→
+   434→   434→      {/* ----------------------- Sticky save bar ----------------------- */}
+   435→   435→      <div className="sticky bottom-4 z-30">
+   436→   436→        <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-background/80 p-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+   437→   437→          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
+   438→   438→            <div className="flex items-center gap-1.5">
+   439→   439→              <Dumbbell className="h-4 w-4 text-muted-foreground" />
+   440→   440→              <span className="font-medium tabular-nums">
+   441→   441→                {entries.length}
+   442→   442→              </span>
+   443→   443→              <span className="text-muted-foreground">entries</span>
+   444→   444→            </div>
+   445→   445→            <div className="flex items-center gap-1.5">
+   446→   446→              <Timer className="h-4 w-4 text-muted-foreground" />
+   447→   447→              <span className="font-medium tabular-nums">{totalSets}</span>
+   448→   448→              <span className="text-muted-foreground">sets</span>
+   449→   449→            </div>
+   450→   450→            <div className="flex items-center gap-1.5">
+   451→   451→              <Weight className="h-4 w-4 text-muted-foreground" />
+   452→   452→              <span className="font-medium tabular-nums">
+   453→   453→                {fmtCompact(totalVolume)}
+   454→   454→              </span>
+   455→   455→              <span className="text-muted-foreground">total volume</span>
+   456→   456→            </div>
+   457→   457→          </div>
+   458→   458→          <Button
+   459→   459→            onClick={handleSave}
+   460→   460→            disabled={createWorkout.isPending}
+   461→   461→            className="sm:min-w-44"
+   462→   462→          >
+   463→   463→            {createWorkout.isPending ? (
+   464→   464→              <>
+   465→   465→                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+   466→   466→                Saving…
+   467→   467→              </>
+   468→   468→            ) : (
+   469→   469→              <>
+   470→   470→                <Save className="h-4 w-4" />
+   471→   471→                Save Workout
+   472→   472→              </>
+   473→   473→            )}
+   474→   474→          </Button>
+   475→   475→        </div>
+   476→   476→      </div>
+   477→   477→
+   478→   478→      {/* ----------------------- Exercise picker dialog ----------------------- */}
+   479→   479→      <ExercisePickerDialog
+   480→   480→        open={pickerOpen}
+   481→   481→        onOpenChange={setPickerOpen}
+   482→   482→        exercises={exercises}
+   483→   483→        onPick={addEntry}
+   484→   484→      />
+   485→   485→    </div>
+   486→   486→  );
+   487→   487→}
+   488→   488→
+   489→   489→// ---------------------------------------------------------------------------
+   490→   490→// EntryCard — one exercise with its sets
+   491→   491→// ---------------------------------------------------------------------------
+   492→   492→function EntryCard({
+   493→   493→  entry,
+   494→   494→  onChange,
+   495→   495→  onRemove,
+   496→   496→  onAddSet,
+   497→   497→  onUpdateSet,
+   498→   498→  onRemoveSet,
+   499→   499→}: {
+   500→   500→  entry: DraftEntry;
+   501→   501→  onChange: (patch: Partial<DraftEntry>) => void;
+   502→   502→  onRemove: () => void;
+   503→   503→  onAddSet: () => void;
+   504→   504→  onUpdateSet: (setId: string, patch: Partial<DraftSet>) => void;
+   505→   505→  onRemoveSet: (setId: string) => void;
+   506→   506→}) {
+   507→   507→  const { exercise, variantId, notes, sets } = entry;
+   508→   508→  const cat = exercise.category as ExerciseCategory;
+   509→   509→  const meta = CATEGORY_META[cat] ?? {
+   510→   510→    label: cat,
+   511→   511→    color: "#9ca3af",
+   512→   512→    emoji: "•",
+   513→   513→  };
+   514→   514→  const isStatic = exercise.isStatic;
+   515→   515→  const metricLabel = isStatic ? "Hold (s)" : "Reps";
+   516→   516→
+   517→   517→  const totalSetsCount = sets.length;
+   518→   518→  const totalVolume = sets.reduce((a, s) => a + draftMetric(s), 0);
+   519→   519→  const bestSet = sets.reduce(
+   520→   520→    (m, s) => Math.max(m, draftMetric(s)),
+   521→   521→    0,
+   522→   522→  );
+   523→   523→
+   524→   524→  const sortedVariants = exercise.variants
+   525→   525→    ? exercise.variants
+   526→   526→        .slice()
+   527→   527→        .sort((a, b) => a.difficultyLevel - b.difficultyLevel)
+   528→   528→    : [];
+   529→   529→
+   530→   530→  return (
+   531→   531→    <Card>
+   532→   532→      <CardHeader>
+   533→   533→        <div className="flex flex-wrap items-center justify-between gap-2">
+   534→   534→          <div className="flex min-w-0 items-center gap-2">
+   535→   535→            <span aria-hidden className="text-base leading-none">
+   536→   536→              {meta.emoji}
+   537→   537→            </span>
+   538→   538→            <CardTitle className="truncate text-base">
+   539→   539→              {exercise.name}
+   540→   540→            </CardTitle>
+   541→   541→            <Badge
+   542→   542→              variant="outline"
+   543→   543→              className="border-transparent"
+   544→   544→              style={{
+   545→   545→                backgroundColor: `${meta.color}22`,
+   546→   546→                color: meta.color,
+   547→   547→              }}
+   548→   548→            >
+   549→   549→              {meta.label}
+   550→   550→            </Badge>
+   551→   551→            {isStatic && (
+   552→   552→              <Badge variant="secondary" className="text-[10px]">
+   553→   553→                Hold
+   554→   554→              </Badge>
+   555→   555→            )}
+   556→   556→          </div>
+   557→   557→          <div className="flex items-center gap-2">
+   558→   558→            <Select
+   559→   559→              value={variantId ?? "__none__"}
+   560→   560→              onValueChange={(v) =>
+   561→   561→                onChange({ variantId: v === "__none__" ? null : v })
+   562→   562→              }
+   563→   563→            >
+   564→   564→              <SelectTrigger size="sm" className="h-8 w-40">
+   565→   565→                <SelectValue placeholder="Standard / None" />
+   566→   566→              </SelectTrigger>
+   567→   567→              <SelectContent>
+   568→   568→                <SelectItem value="__none__">Standard / None</SelectItem>
+   569→   569→                {sortedVariants.map((v) => (
+   570→   570→                  <SelectItem key={v.id} value={v.id}>
+   571→   571→                    {v.name}
+   572→   572→                    <span className="ml-1 text-xs text-muted-foreground">
+   573→   573→                      · Lv {v.difficultyLevel}
+   574→   574→                    </span>
+   575→   575→                  </SelectItem>
+   576→   576→                ))}
+   577→   577→              </SelectContent>
+   578→   578→            </Select>
+   579→   579→            <Button
+   580→   580→              size="icon"
+   581→   581→              variant="ghost"
+   582→   582→              onClick={onRemove}
+   583→   583→              aria-label={`Remove ${exercise.name}`}
+   584→   584→              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+   585→   585→            >
+   586→   586→              <Trash2 className="h-4 w-4" />
+   587→   587→            </Button>
+   588→   588→          </div>
+   589→   589→        </div>
+   590→   590→      </CardHeader>
+   591→   591→
+   592→   592→      <CardContent className="space-y-4">
+   593→   593→        <Input
+   594→   594→          placeholder="Form cues..."
+   595→   595→          value={notes}
+   596→   596→          onChange={(e) => onChange({ notes: e.target.value })}
+   597→   597→          className="h-8"
+   598→   598→          aria-label={`Notes for ${exercise.name}`}
+   599→   599→        />
+   600→   600→
+   601→   601→        {/* Desktop: inline table */}
+   602→   602→        <div className="hidden sm:block">
+   603→   603→          <table className="w-full text-sm">
+   604→   604→            <thead>
+   605→   605→              <tr className="text-xs uppercase text-muted-foreground">
+   606→   606→                <th className="w-10 pb-2 text-left font-medium">Set</th>
+   607→   607→                <th className="pb-2 text-left font-medium">{metricLabel}</th>
+   608→   608→                <th className="pb-2 text-left font-medium">Weight (kg)</th>
+   609→   609→                <th className="pb-2 text-left font-medium">RPE</th>
+   610→   610→                <th className="w-10 pb-2" />
+   611→   611→              </tr>
+   612→   612→            </thead>
+   613→   613→            <tbody>
+   614→   614→              {sets.map((set, idx) => (
+   615→   615→                <tr key={set.id} className="border-t border-border/50">
+   616→   616→                  <td className="py-2 text-muted-foreground tabular-nums">
+   617→   617→                    {idx + 1}
+   618→   618→                  </td>
+   619→   619→                  <td className="py-2 pr-2">
+   620→   620→                    <NumberInput
+   621→   621→                      value={isStatic ? set.holdSeconds : set.reps}
+   622→   622→                      placeholder={isStatic ? "30" : "8"}
+   623→   623→                      aria-label={`${metricLabel} for set ${idx + 1}`}
+   624→   624→                      onChange={(n) =>
+   625→   625→                        onUpdateSet(
+   626→   626→                          set.id,
+   627→   627→                          isStatic ? { holdSeconds: n } : { reps: n },
+   628→   628→                        )
+   629→   629→                      }
+   630→   630→                    />
+   631→   631→                  </td>
+   632→   632→                  <td className="py-2 pr-2">
+   633→   633→                    <NumberInput
+   634→   634→                      value={set.weightKg}
+   635→   635→                      placeholder="0"
+   636→   636→                      step={0.5}
+   637→   637→                      aria-label={`Weight for set ${idx + 1}`}
+   638→   638→                      onChange={(n) =>
+   639→   639→                        onUpdateSet(set.id, { weightKg: n })
+   640→   640→                      }
+   641→   641→                    />
+   642→   642→                  </td>
+   643→   643→                  <td className="py-2 pr-2">
+   644→   644→                    <NumberInput
+   645→   645→                      value={set.rpe}
+   646→   646→                      placeholder="7"
+   647→   647→                      min={1}
+   648→   648→                      max={10}
+   649→   649→                      aria-label={`RPE for set ${idx + 1}`}
+   650→   650→                      onChange={(n) => onUpdateSet(set.id, { rpe: n })}
+   651→   651→                    />
+   652→   652→                  </td>
+   653→   653→                  <td className="py-2">
+   654→   654→                    <Button
+   655→   655→                      size="icon"
+   656→   656→                      variant="ghost"
+   657→   657→                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+   658→   658→                      onClick={() => onRemoveSet(set.id)}
+   659→   659→                      aria-label={`Delete set ${idx + 1}`}
+   660→   660→                    >
+   661→   661→                      <Trash2 className="h-3.5 w-3.5" />
+   662→   662→                    </Button>
+   663→   663→                  </td>
+   664→   664→                </tr>
+   665→   665→              ))}
+   666→   666→              {sets.length === 0 && (
+   667→   667→                <tr>
+   668→   668→                  <td
+   669→   669→                    colSpan={5}
+   670→   670→                    className="py-3 text-center text-xs text-muted-foreground"
+   671→   671→                  >
+   672→   672→                    No sets yet — add one below.
+   673→   673→                  </td>
+   674→   674→                </tr>
+   675→   675→              )}
+   676→   676→            </tbody>
+   677→   677→          </table>
+   678→   678→        </div>
+   679→   679→
+   680→   680→        {/* Mobile: stacked cards */}
+   681→   681→        <div className="space-y-2 sm:hidden">
+   682→   682→          {sets.map((set, idx) => (
+   683→   683→            <div
+   684→   684→              key={set.id}
+   685→   685→              className="rounded-lg border border-border/60 bg-muted/20 p-3"
+   686→   686→            >
+   687→   687→              <div className="mb-2 flex items-center justify-between">
+   688→   688→                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground tabular-nums">
+   689→   689→                  Set {idx + 1}
+   690→   690→                </span>
+   691→   691→                <Button
+   692→   692→                  size="icon"
+   693→   693→                  variant="ghost"
+   694→   694→                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+   695→   695→                  onClick={() => onRemoveSet(set.id)}
+   696→   696→                  aria-label={`Delete set ${idx + 1}`}
+   697→   697→                >
+   698→   698→                  <Trash2 className="h-3.5 w-3.5" />
+   699→   699→                </Button>
+   700→   700→              </div>
+   701→   701→              <div className="grid grid-cols-3 gap-2">
+   702→   702→                <LabeledNumber
+   703→   703→                  label={metricLabel}
+   704→   704→                  value={isStatic ? set.holdSeconds : set.reps}
+   705→   705→                  placeholder={isStatic ? "30" : "8"}
+   706→   706→                  onChange={(n) =>
+   707→   707→                    onUpdateSet(
+   708→   708→                      set.id,
+   709→   709→                      isStatic ? { holdSeconds: n } : { reps: n },
+   710→   710→                    )
+   711→   711→                  }
+   712→   712→                />
+   713→   713→                <LabeledNumber
+   714→   714→                  label="Weight (kg)"
+   715→   715→                  value={set.weightKg}
+   716→   716→                  placeholder="0"
+   717→   717→                  step={0.5}
+   718→   718→                  onChange={(n) => onUpdateSet(set.id, { weightKg: n })}
+   719→   719→                />
+   720→   720→                <LabeledNumber
+   721→   721→                  label="RPE"
+   722→   722→                  value={set.rpe}
+   723→   723→                  placeholder="7"
+   724→   724→                  min={1}
+   725→   725→                  max={10}
+   726→   726→                  onChange={(n) => onUpdateSet(set.id, { rpe: n })}
+   727→   727→                />
+   728→   728→              </div>
+   729→   729→            </div>
+   730→   730→          ))}
+   731→   731→          {sets.length === 0 && (
+   732→   732→            <p className="py-3 text-center text-xs text-muted-foreground">
+   733→   733→              No sets yet — add one below.
+   734→   734→            </p>
+   735→   735→          )}
+   736→   736→        </div>
+   737→   737→
+   738→   738→        <Button variant="outline" size="sm" onClick={onAddSet}>
+   739→   739→          <Plus className="h-4 w-4" />
+   740→   740→          Add Set
+   741→   741→        </Button>
+   742→   742→
+   743→   743→        <Separator />
+   744→   744→
+   745→   745→        {/* Per-entry summary */}
+   746→   746→        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+   747→   747→          <span>
+   748→   748→            <span className="font-medium text-foreground tabular-nums">
+   749→   749→              {totalSetsCount}
+   750→   750→            </span>{" "}
+   751→   751→            sets
+   752→   752→          </span>
+   753→   753→          <span>
+   754→   754→            Volume{" "}
+   755→   755→            <span className="font-medium text-foreground tabular-nums">
+   756→   756→              {fmtCompact(totalVolume)}
+   757→   757→            </span>{" "}
+   758→   758→            {metricUnit(isStatic)}
+   759→   759→          </span>
+   760→   760→          <span>
+   761→   761→            Best{" "}
+   762→   762→            <span className="font-medium text-foreground tabular-nums">
+   763→   763→              {fmtCompact(bestSet)}
+   764→   764→            </span>{" "}
+   765→   765→            {metricUnit(isStatic)}
+   766→   766→          </span>
+   767→   767→        </div>
+   768→   768→      </CardContent>
+   769→   769→    </Card>
+   770→   770→  );
+   771→   771→}
+   772→   772→
+   773→   773→// ---------------------------------------------------------------------------
+   774→   774→// Small numeric input primitives
+   775→   775→// ---------------------------------------------------------------------------
+   776→   776→function NumberInput({
+   777→   777→  value,
+   778→   778→  onChange,
+   779→   779→  placeholder,
+   780→   780→  step,
+   781→   781→  min,
+   782→   782→  max,
+   783→   783→  "aria-label": ariaLabel,
+   784→   784→}: {
+   785→   785→  value: number | undefined;
+   786→   786→  onChange: (n: number | undefined) => void;
+   787→   787→  placeholder?: string;
+   788→   788→  step?: number;
+   789→   789→  min?: number;
+   790→   790→  max?: number;
+   791→   791→  "aria-label"?: string;
+   792→   792→}) {
+   793→   793→  return (
+   794→   794→    <Input
+   795→   795→      type="number"
+   796→   796→      inputMode="decimal"
+   797→   797→      step={step}
+   798→   798→      min={min}
+   799→   799→      max={max}
+   800→   800→      placeholder={placeholder}
+   801→   801→      value={value ?? ""}
+   802→   802→      onChange={(e) => {
+   803→   803→        const v = e.target.value;
+   804→   804→        if (v === "") {
+   805→   805→          onChange(undefined);
+   806→   806→          return;
+   807→   807→        }
+   808→   808→        const n = Number(v);
+   809→   809→        if (Number.isNaN(n)) {
+   810→   810→          onChange(undefined);
+   811→   811→          return;
+   812→   812→        }
+   813→   813→        onChange(n);
+   814→   814→      }}
+   815→   815→      className="h-9 w-16 tabular-nums"
+   816→   816→      aria-label={ariaLabel}
+   817→   817→    />
+   818→   818→  );
+   819→   819→}
+   820→   820→
+   821→   821→function LabeledNumber({
+   822→   822→  label,
+   823→   823→  value,
+   824→   824→  onChange,
+   825→   825→  placeholder,
+   826→   826→  step,
+   827→   827→  min,
+   828→   828→  max,
+   829→   829→}: {
+   830→   830→  label: string;
+   831→   831→  value: number | undefined;
+   832→   832→  onChange: (n: number | undefined) => void;
+   833→   833→  placeholder?: string;
+   834→   834→  step?: number;
+   835→   835→  min?: number;
+   836→   836→  max?: number;
+   837→   837→}) {
+   838→   838→  return (
+   839→   839→    <div className="space-y-1">
+   840→   840→      <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+   841→   841→        {label}
+   842→   842→      </span>
+   843→   843→      <Input
+   844→   844→        type="number"
+   845→   845→        inputMode="decimal"
+   846→   846→        step={step}
+   847→   847→        min={min}
+   848→   848→        max={max}
+   849→   849→        placeholder={placeholder}
+   850→   850→        value={value ?? ""}
+   851→   851→        onChange={(e) => {
+   852→   852→          const v = e.target.value;
+   853→   853→          if (v === "") {
+   854→   854→            onChange(undefined);
+   855→   855→            return;
+   856→   856→          }
+   857→   857→          const n = Number(v);
+   858→   858→          if (Number.isNaN(n)) {
+   859→   859→            onChange(undefined);
+   860→   860→            return;
+   861→   861→          }
+   862→   862→          onChange(n);
+   863→   863→        }}
+   864→   864→        className="h-9 tabular-nums"
+   865→   865→      />
+   866→   866→    </div>
+   867→   867→  );
+   868→   868→}
+   869→   869→
+   870→   870→// ---------------------------------------------------------------------------
+   871→   871→// Exercise picker dialog (Command list grouped by category)
+   872→   872→// ---------------------------------------------------------------------------
+   873→   873→function ExercisePickerDialog({
+   874→   874→  open,
+   875→   875→  onOpenChange,
+   876→   876→  exercises,
+   877→   877→  onPick,
+   878→   878→}: {
+   879→   879→  open: boolean;
+   880→   880→  onOpenChange: (v: boolean) => void;
+   881→   881→  exercises: ExerciseWithVariants[];
+   882→   882→  onPick: (e: ExerciseWithVariants) => void;
+   883→   883→}) {
+   884→   884→  const grouped = React.useMemo(() => {
+   885→   885→    const map = new Map<ExerciseCategory, ExerciseWithVariants[]>();
+   886→   886→    for (const ex of exercises) {
+   887→   887→      const cat = ex.category as ExerciseCategory;
+   888→   888→      const arr = map.get(cat) ?? [];
+   889→   889→      arr.push(ex);
+   890→   890→      map.set(cat, arr);
+   891→   891→    }
+   892→   892→    return Array.from(map.entries()).sort((a, b) =>
+   893→   893→      a[0].localeCompare(b[0]),
+   894→   894→    );
+   895→   895→  }, [exercises]);
+   896→   896→
+   897→   897→  return (
+   898→   898→    <CommandDialog
+   899→   899→      open={open}
+   900→   900→      onOpenChange={onOpenChange}
+   901→   901→      title="Add an exercise"
+   902→   902→      description="Search and pick an exercise to add to your workout."
+   903→   903→      className="sm:max-w-md"
+   904→   904→    >
+   905→   905→      <Command>
+   906→   906→        <CommandInput placeholder="Search exercises..." />
+   907→   907→        <CommandList>
+   908→   908→          <CommandEmpty>No exercise found.</CommandEmpty>
+   909→   909→          {grouped.map(([cat, list]) => {
+   910→   910→            const meta = CATEGORY_META[cat] ?? {
+   911→   911→              label: cat,
+   912→   912→              color: "#9ca3af",
+   913→   913→              emoji: "•",
+   914→   914→            };
+   915→   915→            return (
+   916→   916→              <CommandGroup
+   917→   917→                key={cat}
+   918→   918→                heading={`${meta.emoji} ${meta.label}`}
+   919→   919→              >
+   920→   920→                {list.map((ex) => (
+   921→   921→                  <CommandItem
+   922→   922→                    key={ex.id}
+   923→   923→                    value={`${ex.name} ${cat} ${ex.muscleGroup}`}
+   924→   924→                    onSelect={() => onPick(ex)}
+   925→   925→                  >
+   926→   926→                    <span aria-hidden className="text-base leading-none">
+   927→   927→                      {meta.emoji}
+   928→   928→                    </span>
+   929→   929→                    <span className="flex-1 truncate">{ex.name}</span>
+   930→   930→                    {ex.isStatic && (
+   931→   931→                      <Badge
+   932→   932→                        variant="secondary"
+   933→   933→                        className="text-[10px]"
+   934→   934→                      >
+   935→   935→                        Hold
+   936→   936→                      </Badge>
+   937→   937→                    )}
+   938→   938→                  </CommandItem>
+   939→   939→                ))}
+   940→   940→              </CommandGroup>
+   941→   941→            );
+   942→   942→          })}
+   943→   943→        </CommandList>
+   944→   944→      </Command>
+   945→   945→    </CommandDialog>
+   946→   946→  );
+   947→   947→}
+   948→   948→

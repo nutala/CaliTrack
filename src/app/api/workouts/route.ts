@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
 /** GET /api/workouts — list workouts (newest first), with entries summary. */
+// recompile trigger
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const limit = Math.min(Number(url.searchParams.get("limit") ?? "50"), 200);
@@ -79,6 +80,8 @@ export async function POST(req: Request) {
             workoutId: workout.id,
             exerciseId: e.exerciseId,
             variantId: e.variantId || null,
+            supersetGroup:
+              typeof e.supersetGroup === "number" ? e.supersetGroup : null,
             notes: e.notes ?? null,
           },
         });

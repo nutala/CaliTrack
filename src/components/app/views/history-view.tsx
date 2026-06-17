@@ -21,6 +21,8 @@ import {
   setMetric,
   difficultyStars,
   variantLabel,
+  supersetLabel,
+  supersetColor,
 } from "@/lib/calc";
 import { EmptyState } from "@/components/app/common";
 import { Card, CardContent } from "@/components/ui/card";
@@ -73,9 +75,11 @@ import {
   Gauge,
   History,
   Layers,
+  Link2,
   MoreVertical,
   Pencil,
   PlusCircle,
+  RefreshCw,
   Search,
   Timer,
   Trash2,
@@ -479,6 +483,7 @@ function Chip({
 function OverflowMenu({ workout }: { workout: WorkoutFull }) {
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const repeatWorkout = useAppStore((s) => s.repeatWorkout);
 
   return (
     <>
@@ -495,6 +500,10 @@ function OverflowMenu({ workout }: { workout: WorkoutFull }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => repeatWorkout(workout)}>
+            <RefreshCw className="h-4 w-4" />
+            Repeat workout
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setEditOpen(true)}>
             <Pencil className="h-4 w-4" />
             Edit
@@ -538,8 +547,19 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
   const best = entry.sets.reduce((m, s) => Math.max(m, setMetric(s)), 0);
   const diff = entry.variant?.difficultyLevel ?? 1;
 
+  const ssLabel = supersetLabel(entry.supersetGroup);
+  const ssColor = supersetColor(entry.supersetGroup);
+  const inSuperset = entry.supersetGroup != null;
+
   return (
-    <div className="rounded-md border border-border/60 p-3">
+    <div
+      className="rounded-md border border-border/60 p-3"
+      style={
+        inSuperset && ssColor
+          ? { borderLeftColor: ssColor, borderLeftWidth: 3 }
+          : undefined
+      }
+    >
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-foreground">
           {entry.exercise.name}
@@ -555,6 +575,17 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
           {variantLabel(entry.variant)}
           <span className="ml-1 tabular-nums">{difficultyStars(diff)}</span>
         </span>
+        {inSuperset && ssColor && ssLabel && (
+          <Badge
+            variant="outline"
+            className="ml-auto gap-1 border-transparent text-[10px] font-bold"
+            style={{ backgroundColor: `${ssColor}22`, color: ssColor }}
+            title="Part of a superset"
+          >
+            <Link2 className="h-3 w-3" />
+            Superset {ssLabel}
+          </Badge>
+        )}
       </div>
 
       {entry.notes?.trim() && (

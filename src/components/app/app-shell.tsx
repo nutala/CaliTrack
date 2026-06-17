@@ -12,6 +12,7 @@ import {
 import { useAppStore, type ViewId } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/app/theme-toggle";
+import { RestTimerWidget } from "@/components/app/rest-timer-widget";
 import { Button } from "@/components/ui/button";
 
 const NAV: { id: ViewId; label: string; icon: React.ComponentType<{ className?: string }>; short: string }[] = [
@@ -137,6 +138,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
+
+      {/* Floating rest timer (persists across views) */}
+      <RestTimerWidget />
     </div>
   );
 }

@@ -142,6 +142,7 @@ export type NewWorkoutPayload = {
   entries: {
     exerciseId: string;
     variantId?: string | null;
+    supersetGroup?: number | null;
     notes?: string;
     sets: {
       reps?: number;
