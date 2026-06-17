@@ -1,0 +1,110 @@
+// Calisthenics Tracker - Prisma schema
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// A tracked calisthenics exercise (e.g. Planche, Pull-up, Pistol Squat)
+model Exercise {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  /// Push, Pull, Legs, Core, Static, Mobility, Skill
+  category    String   @default("Push")
+  /// Primary muscle group targeted
+  muscleGroup String   @default("Full body")
+  /// true = isometric hold (tracked in seconds), false = dynamic reps
+  isStatic    Boolean  @default(false)
+  description String?
+  /// Equipment or setup hints (paralettes, wall, rings...)
+  equipment   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  variants     ExerciseVariant[]
+  workoutEntries WorkoutEntry[]
+
+  @@index([category])
+}
+
+/// A progression variant of an exercise (Tuck, Advanced Tuck, Straddle, Full...)
+model ExerciseVariant {
+  id              String   @id @default(cuid())
+  exerciseId      String
+  name            String
+  /// Difficulty rank within the exercise's progression (1 = easiest)
+  difficultyLevel Int      @default(1)
+  description     String?
+  /// Optional target hold (seconds) or reps to "graduate" this variant
+  targetValue     Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  exercise       Exercise     @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  workoutEntries WorkoutEntry[]
+
+  @@unique([exerciseId, name])
+  @@index([exerciseId])
+}
+
+/// A logged training session
+model Workout {
+  id        String   @id @default(cuid())
+  /// Date the workout was performed (date only, stored as DateTime midnight)
+  date      DateTime @default(now())
+  title     String?
+  durationMin Int?
+  /// User-perceived exertion 1-10
+  perceivedExertion Int?
+  bodyweightKg Float?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries WorkoutEntry[]
+
+  @@index([date])
+}
+
+/// An exercise (with optional variant) performed inside a workout
+model WorkoutEntry {
+  id         String   @id @default(cuid())
+  workoutId  String
+  exerciseId String
+  variantId  String?
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  workout   Workout   @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise  Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  variant   ExerciseVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  sets      WorkoutSet[]
+
+  @@index([workoutId])
+  @@index([exerciseId])
+}
+
+/// A single set within a workout entry
+model WorkoutSet {
+  id              String   @id @default(cuid())
+  workoutEntryId  String
+  setNumber       Int
+  /// Repetitions (for dynamic exercises)
+  reps            Int?
+  /// Hold duration in seconds (for isometric exercises)
+  holdSeconds     Int?
+  /// Extra weight in kg (weighted calisthenics)
+  weightKg        Float?
+  /// Rate of perceived exertion 1-10
+  rpe             Int?
+  createdAt       DateTime @default(now())
+
+  workoutEntry WorkoutEntry @relation(fields: [workoutEntryId], references: [id], onDelete: Cascade)
+
+  @@index([workoutEntryId])
+}

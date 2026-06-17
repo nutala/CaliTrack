@@ -1,0 +1,1029 @@
+"use client";
+
+import * as React from "react";
+import {
+  Dumbbell,
+  Plus,
+  Search,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Clock,
+  Repeat,
+  Star,
+  Target,
+} from "lucide-react";
+
+import {
+  CATEGORIES,
+  CATEGORY_META,
+  type ExerciseCategory,
+  type ExerciseWithVariants,
+  type ExerciseVariant,
+} from "@/lib/types";
+import { metricUnit, difficultyStars } from "@/lib/calc";
+import {
+  useExercises,
+  useCreateExercise,
+  useUpdateExercise,
+  useDeleteExercise,
+  useAddVariant,
+  useUpdateVariant,
+  useDeleteVariant,
+} from "@/hooks/use-data";
+import { EmptyState, SectionHeading } from "@/components/app/common";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+
+/* ------------------------------------------------------------------ */
+/* Form state types                                                   */
+/* ------------------------------------------------------------------ */
+
+interface ExerciseFormState {
+  name: string;
+  category: ExerciseCategory;
+  muscleGroup: string;
+  isStatic: boolean;
+  description: string;
+  equipment: string;
+}
+
+interface VariantFormState {
+  name: string;
+  difficultyLevel: number;
+  targetValue: number;
+  description: string;
+}
+
+const EMPTY_EXERCISE_FORM: ExerciseFormState = {
+  name: "",
+  category: "Push",
+  muscleGroup: "Full body",
+  isStatic: false,
+  description: "",
+  equipment: "",
+};
+
+const EMPTY_VARIANT_FORM: VariantFormState = {
+  name: "",
+  difficultyLevel: 1,
+  targetValue: 0,
+  description: "",
+};
+
+/* ------------------------------------------------------------------ */
+/* Main view                                                          */
+/* ------------------------------------------------------------------ */
+
+export function ExercisesView() {
+  const { data: exercises, isLoading } = useExercises();
+  const createExercise = useCreateExercise();
+  const updateExercise = useUpdateExercise();
+  const deleteExercise = useDeleteExercise();
+  const addVariant = useAddVariant();
+  const updateVariant = useUpdateVariant();
+  const deleteVariant = useDeleteVariant();
+
+  // Filters
+  const [search, setSearch] = React.useState("");
+  const [activeCategories, setActiveCategories] = React.useState<Set<ExerciseCategory>>(
+    new Set(),
+  );
+
+  // Exercise dialog state
+  const [exerciseDialogOpen, setExerciseDialogOpen] = React.useState(false);
+  const [editingExercise, setEditingExercise] =
+    React.useState<ExerciseWithVariants | null>(null);
+
+  // Delete exercise dialog
+  const [deletingExercise, setDeletingExercise] =
+    React.useState<ExerciseWithVariants | null>(null);
+
+  // Variant dialog state
+  const [variantDialogOpen, setVariantDialogOpen] = React.useState(false);
+  const [variantContext, setVariantContext] = React.useState<{
+    exerciseId: string;
+    isStatic: boolean;
+    variant: ExerciseVariant | null;
+  } | null>(null);
+
+  // Delete variant dialog
+  const [deletingVariant, setDeletingVariant] = React.useState<{
+    exerciseId: string;
+    variant: ExerciseVariant;
+  } | null>(null);
+
+  /* ----- filter logic ----- */
+  const filtered = React.useMemo(() => {
+    if (!exercises) return [];
+    const q = search.trim().toLowerCase();
+    return exercises.filter((ex) => {
+      const matchesSearch =
+        !q || ex.name.toLowerCase().includes(q) || (ex.muscleGroup ?? "").toLowerCase().includes(q);
+      const matchesCategory =
+        activeCategories.size === 0 || activeCategories.has(ex.category as ExerciseCategory);
+      return matchesSearch && matchesCategory;
+    });
+  }, [exercises, search, activeCategories]);
+
+  const grouped = React.useMemo(() => {
+    const map = new Map<ExerciseCategory, ExerciseWithVariants[]>();
+    for (const cat of CATEGORIES) map.set(cat, []);
+    for (const ex of filtered) {
+      const cat = ex.category as ExerciseCategory;
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(ex);
+    }
+    return map;
+  }, [filtered]);
+
+  const totalCount = filtered.length;
+
+  const toggleCategory = (cat: ExerciseCategory) => {
+    setActiveCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  /* ----- exercise form handlers ----- */
+  const openCreateExercise = () => {
+    setEditingExercise(null);
+    setExerciseDialogOpen(true);
+  };
+
+  const openEditExercise = (ex: ExerciseWithVariants) => {
+    setEditingExercise(ex);
+    setExerciseDialogOpen(true);
+  };
+
+  const submitExercise = (form: ExerciseFormState) => {
+    const payload = {
+      name: form.name.trim(),
+      category: form.category,
+      muscleGroup: form.muscleGroup.trim() || "Full body",
+      isStatic: form.isStatic,
+      description: form.description.trim() ? form.description.trim() : null,
+      equipment: form.equipment.trim() ? form.equipment.trim() : null,
+    };
+    if (editingExercise) {
+      updateExercise.mutate({ id: editingExercise.id, body: payload });
+    } else {
+      createExercise.mutate(payload);
+    }
+    setExerciseDialogOpen(false);
+    setEditingExercise(null);
+  };
+
+  const confirmDeleteExercise = () => {
+    if (!deletingExercise) return;
+    deleteExercise.mutate(deletingExercise.id);
+    setDeletingExercise(null);
+  };
+
+  /* ----- variant form handlers ----- */
+  const openAddVariant = (exerciseId: string, isStatic: boolean) => {
+    setVariantContext({ exerciseId, isStatic, variant: null });
+    setVariantDialogOpen(true);
+  };
+
+  const openEditVariant = (
+    exerciseId: string,
+    isStatic: boolean,
+    variant: ExerciseVariant,
+  ) => {
+    setVariantContext({ exerciseId, isStatic, variant });
+    setVariantDialogOpen(true);
+  };
+
+  const submitVariant = (form: VariantFormState) => {
+    if (!variantContext) return;
+    const { exerciseId, variant } = variantContext;
+    const name = form.name.trim();
+    const difficultyLevel = Number(form.difficultyLevel) || 1;
+    const targetValue =
+      form.targetValue > 0 ? Number(form.targetValue) : undefined;
+    const description = form.description.trim()
+      ? form.description.trim()
+      : undefined;
+    if (variant) {
+      // Update uses Record<string, unknown>; send null to clear optional fields.
+      updateVariant.mutate({
+        id: variant.id,
+        body: {
+          name,
+          difficultyLevel,
+          targetValue: targetValue ?? null,
+          description: description ?? null,
+        },
+      });
+    } else {
+      // Create uses typed body with optional fields — use undefined to omit.
+      addVariant.mutate({
+        exerciseId,
+        body: { name, difficultyLevel, targetValue, description },
+      });
+    }
+    setVariantDialogOpen(false);
+    setVariantContext(null);
+  };
+
+  const confirmDeleteVariant = () => {
+    if (!deletingVariant) return;
+    deleteVariant.mutate(deletingVariant.variant.id);
+    setDeletingVariant(null);
+  };
+
+  /* ----- render ----- */
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search exercises by name…"
+              className="pl-9"
+              aria-label="Search exercises"
+            />
+          </div>
+          <Button onClick={openCreateExercise} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add Exercise
+          </Button>
+        </div>
+
+        {/* Category filter chips */}
+        <div className="flex flex-wrap items-center gap-2">
+          {CATEGORIES.map((cat) => {
+            const meta = CATEGORY_META[cat];
+            const active = activeCategories.has(cat);
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => toggleCategory(cat)}
+                aria-pressed={active}
+                className={cn(
+                  "inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors tabular-nums",
+                  active
+                    ? "border-transparent text-white shadow-sm"
+                    : "border-border bg-muted/40 text-muted-foreground hover:bg-muted",
+                )}
+                style={
+                  active
+                    ? { backgroundColor: meta.color, color: "white" }
+                    : undefined
+                }
+              >
+                <span aria-hidden>{meta.emoji}</span>
+                {meta.label}
+              </button>
+            );
+          })}
+          {activeCategories.size > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-muted-foreground"
+              onClick={() => setActiveCategories(new Set())}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* List */}
+      <ScrollArea className="max-h-[calc(100vh-220px)] pr-3">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+            <Dumbbell className="mb-3 h-8 w-8 animate-pulse" />
+            <p className="text-sm">Loading exercises…</p>
+          </div>
+        ) : totalCount === 0 ? (
+          <EmptyState
+            icon={Dumbbell}
+            title={search || activeCategories.size > 0 ? "No exercises match" : "No exercises yet"}
+            description={
+              search || activeCategories.size > 0
+                ? "Try adjusting your search or category filters."
+                : "Add your first exercise to start tracking your calisthenics progressions."
+            }
+            action={
+              !search && activeCategories.size === 0 ? (
+                <Button onClick={openCreateExercise} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Exercise
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <div className="flex flex-col gap-8">
+            {CATEGORIES.map((cat) => {
+              const items = grouped.get(cat) ?? [];
+              if (items.length === 0) return null;
+              const meta = CATEGORY_META[cat];
+              return (
+                <section key={cat} className="flex flex-col">
+                  <SectionHeading
+                    title={`${meta.emoji}  ${meta.label}`}
+                    subtitle={`${items.length} exercise${items.length === 1 ? "" : "s"}`}
+                  />
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {items.map((ex) => (
+                      <ExerciseCard
+                        key={ex.id}
+                        exercise={ex}
+                        onEdit={() => openEditExercise(ex)}
+                        onDelete={() => setDeletingExercise(ex)}
+                        onAddVariant={() => openAddVariant(ex.id, ex.isStatic)}
+                        onEditVariant={(v) => openEditVariant(ex.id, ex.isStatic, v)}
+                        onDeleteVariant={(v) =>
+                          setDeletingVariant({ exerciseId: ex.id, variant: v })
+                        }
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        )}
+      </ScrollArea>
+
+      {/* Exercise create/edit dialog */}
+      <ExerciseFormDialog
+        open={exerciseDialogOpen}
+        onOpenChange={setExerciseDialogOpen}
+        editing={editingExercise}
+        onSubmit={submitExercise}
+        pending={createExercise.isPending || updateExercise.isPending}
+      />
+
+      {/* Delete exercise confirmation */}
+      <AlertDialog
+        open={!!deletingExercise}
+        onOpenChange={(o) => !o && setDeletingExercise(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete exercise?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingExercise && (
+                <>
+                  This will permanently delete{" "}
+                  <span className="font-semibold text-foreground">
+                    {deletingExercise.name}
+                  </span>{" "}
+                  and all of its progression variants. Because exercises are referenced
+                  by workout entries, every past workout entry that uses this exercise
+                  will also be removed. This action cannot be undone.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={confirmDeleteExercise}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Variant create/edit dialog */}
+      <VariantFormDialog
+        open={variantDialogOpen}
+        onOpenChange={setVariantDialogOpen}
+        context={variantContext}
+        onSubmit={submitVariant}
+        pending={addVariant.isPending || updateVariant.isPending}
+      />
+
+      {/* Delete variant confirmation */}
+      <AlertDialog
+        open={!!deletingVariant}
+        onOpenChange={(o) => !o && setDeletingVariant(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete variant?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingVariant && (
+                <>
+                  Remove the{" "}
+                  <span className="font-semibold text-foreground">
+                    {deletingVariant.variant.name}
+                  </span>{" "}
+                  progression? Past workout sets referencing this variant will have
+                  their variant cleared (set to null), but the workout entries
+                  themselves are kept.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={confirmDeleteVariant}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Exercise card                                                      */
+/* ------------------------------------------------------------------ */
+
+function ExerciseCard({
+  exercise,
+  onEdit,
+  onDelete,
+  onAddVariant,
+  onEditVariant,
+  onDeleteVariant,
+}: {
+  exercise: ExerciseWithVariants;
+  onEdit: () => void;
+  onDelete: () => void;
+  onAddVariant: () => void;
+  onEditVariant: (v: ExerciseVariant) => void;
+  onDeleteVariant: (v: ExerciseVariant) => void;
+}) {
+  const meta = CATEGORY_META[exercise.category as ExerciseCategory] ?? CATEGORY_META.Push;
+  const sortedVariants = React.useMemo(
+    () =>
+      [...exercise.variants].sort(
+        (a, b) => (a.difficultyLevel ?? 1) - (b.difficultyLevel ?? 1),
+      ),
+    [exercise.variants],
+  );
+  const unit = metricUnit(exercise.isStatic);
+
+  return (
+    <Card
+      className="overflow-hidden py-0"
+      style={{ borderLeftWidth: 4, borderLeftColor: meta.color }}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 px-4 pt-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-base font-bold text-foreground">
+            {exercise.name}
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {exercise.muscleGroup}
+            {exercise.equipment ? ` · ${exercise.equipment}` : ""}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Badge
+            className="border-transparent text-[10px]"
+            style={{ backgroundColor: meta.color, color: "white" }}
+          >
+            {meta.label}
+          </Badge>
+          <Badge
+            variant="outline"
+            className="gap-1 text-[10px] font-medium text-muted-foreground"
+          >
+            {exercise.isStatic ? (
+              <>
+                <Clock className="h-3 w-3" />
+                Hold
+              </>
+            ) : (
+              <>
+                <Repeat className="h-3 w-3" />
+                Reps
+              </>
+            )}
+          </Badge>
+        </div>
+      </div>
+
+      {/* Description */}
+      {exercise.description && (
+        <p className="mt-2 px-4 text-sm text-muted-foreground line-clamp-2">
+          {exercise.description}
+        </p>
+      )}
+
+      {/* Progression tree */}
+      <CardContent className="mt-3 px-4 pb-3">
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Progression
+          </span>
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            {sortedVariants.length} step{sortedVariants.length === 1 ? "" : "s"}
+          </span>
+        </div>
+
+        {sortedVariants.length === 0 ? (
+          <div className="rounded-md border border-dashed border-border/60 bg-muted/20 px-3 py-2.5 text-center text-xs text-muted-foreground">
+            No variants yet. Add the first progression step.
+          </div>
+        ) : (
+          <ol className="flex flex-col">
+            {sortedVariants.map((v, idx) => {
+              const isLast = idx === sortedVariants.length - 1;
+              return (
+                <li
+                  key={v.id}
+                  className="group relative flex items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors hover:bg-muted/40"
+                >
+                  {/* connector + rank circle */}
+                  <div className="relative flex flex-col items-center">
+                    {!isLast && (
+                      <span
+                        className="absolute top-1/2 h-[calc(100%+0.25rem)] w-px bg-border"
+                        aria-hidden
+                      />
+                    )}
+                    <span
+                      className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border bg-background text-[11px] font-bold tabular-nums text-foreground"
+                    >
+                      {idx + 1}
+                    </span>
+                  </div>
+
+                  {/* body */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium text-foreground">
+                        {v.name}
+                      </span>
+                      <span
+                        className="shrink-0 text-[11px] tracking-tight text-amber-500"
+                        aria-label={`Difficulty ${v.difficultyLevel} of 5`}
+                      >
+                        {difficultyStars(v.difficultyLevel)}
+                      </span>
+                    </div>
+                    {v.description && (
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {v.description}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* target + actions */}
+                  <div className="flex items-center gap-1.5">
+                    {v.targetValue ? (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground tabular-nums">
+                        <Target className="h-3 w-3" />
+                        {v.targetValue}
+                        <span className="opacity-70">{unit}</span>
+                      </span>
+                    ) : null}
+                    <div className="flex items-center opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        onClick={() => onEditVariant(v)}
+                        aria-label="Edit variant"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => onDeleteVariant(v)}
+                        aria-label="Delete variant"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </CardContent>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/20 px-4 py-2.5">
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
+          <Star className="h-3.5 w-3.5 text-amber-500" />
+          {sortedVariants.length} variant{sortedVariants.length === 1 ? "" : "s"}
+        </span>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+            onClick={onAddVariant}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Variant
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                aria-label="Exercise actions"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onEdit}>
+                <Pencil className="h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={onDelete}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Exercise form dialog (create + edit)                               */
+/* ------------------------------------------------------------------ */
+
+function ExerciseFormDialog({
+  open,
+  onOpenChange,
+  editing,
+  onSubmit,
+  pending,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  editing: ExerciseWithVariants | null;
+  onSubmit: (form: ExerciseFormState) => void;
+  pending: boolean;
+}) {
+  const [form, setForm] = React.useState<ExerciseFormState>(EMPTY_EXERCISE_FORM);
+
+  React.useEffect(() => {
+    if (!open) return;
+    if (editing) {
+      setForm({
+        name: editing.name,
+        category: (editing.category as ExerciseCategory) ?? "Push",
+        muscleGroup: editing.muscleGroup ?? "Full body",
+        isStatic: editing.isStatic,
+        description: editing.description ?? "",
+        equipment: editing.equipment ?? "",
+      });
+    } else {
+      setForm(EMPTY_EXERCISE_FORM);
+    }
+  }, [open, editing]);
+
+  const update = <K extends keyof ExerciseFormState>(
+    key: K,
+    value: ExerciseFormState[K],
+  ) => setForm((p) => ({ ...p, [key]: value }));
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    onSubmit(form);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {editing ? "Edit exercise" : "Add exercise"}
+          </DialogTitle>
+          <DialogDescription>
+            {editing
+              ? "Update the exercise details and progression settings."
+              : "Create a new tracked exercise. You can add progression variants afterwards."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ex-name">Name</Label>
+            <Input
+              id="ex-name"
+              value={form.name}
+              onChange={(e) => update("name", e.target.value)}
+              placeholder="e.g. Planche, Pull-up, Pistol Squat"
+              autoFocus
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label>Category</Label>
+              <Select
+                value={form.category}
+                onValueChange={(v) => update("category", v as ExerciseCategory)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Pick a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {CATEGORY_META[cat].emoji} {CATEGORY_META[cat].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="ex-muscle">Muscle group</Label>
+              <Input
+                id="ex-muscle"
+                value={form.muscleGroup}
+                onChange={(e) => update("muscleGroup", e.target.value)}
+                placeholder="e.g. Chest, Back, Full body"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-muted/20 px-3 py-3">
+            <div className="min-w-0">
+              <Label htmlFor="ex-static" className="cursor-pointer">
+                Isometric hold
+              </Label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Track seconds instead of reps.
+              </p>
+            </div>
+            <Switch
+              id="ex-static"
+              checked={form.isStatic}
+              onCheckedChange={(v) => update("isStatic", v)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ex-equipment">Equipment (optional)</Label>
+            <Input
+              id="ex-equipment"
+              value={form.equipment}
+              onChange={(e) => update("equipment", e.target.value)}
+              placeholder="e.g. Paralettes, Rings, Wall"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ex-desc">Description (optional)</Label>
+            <Textarea
+              id="ex-desc"
+              value={form.description}
+              onChange={(e) => update("description", e.target.value)}
+              placeholder="Brief notes about form, setup, or purpose."
+              rows={3}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={pending || !form.name.trim()}>
+              {pending ? "Saving…" : editing ? "Save changes" : "Create exercise"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Variant form dialog (create + edit)                                */
+/* ------------------------------------------------------------------ */
+
+function VariantFormDialog({
+  open,
+  onOpenChange,
+  context,
+  onSubmit,
+  pending,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  context: {
+    exerciseId: string;
+    isStatic: boolean;
+    variant: ExerciseVariant | null;
+  } | null;
+  onSubmit: (form: VariantFormState) => void;
+  pending: boolean;
+}) {
+  const [form, setForm] = React.useState<VariantFormState>(EMPTY_VARIANT_FORM);
+
+  React.useEffect(() => {
+    if (!open || !context) return;
+    if (context.variant) {
+      setForm({
+        name: context.variant.name,
+        difficultyLevel: context.variant.difficultyLevel ?? 1,
+        targetValue: context.variant.targetValue ?? 0,
+        description: context.variant.description ?? "",
+      });
+    } else {
+      setForm(EMPTY_VARIANT_FORM);
+    }
+  }, [open, context]);
+
+  const update = <K extends keyof VariantFormState>(
+    key: K,
+    value: VariantFormState[K],
+  ) => setForm((p) => ({ ...p, [key]: value }));
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim() || !context) return;
+    onSubmit(form);
+  };
+
+  const unit = context ? metricUnit(context.isStatic) : "reps";
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {context?.variant ? "Edit variant" : "Add progression variant"}
+          </DialogTitle>
+          <DialogDescription>
+            {context?.variant
+              ? "Update this progression step in the exercise tree."
+              : "Add a new step to the progression (e.g. Tuck → Advanced Tuck → Full)."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="var-name">Variant name</Label>
+            <Input
+              id="var-name"
+              value={form.name}
+              onChange={(e) => update("name", e.target.value)}
+              placeholder="e.g. Tuck, Advanced Tuck, Straddle, Full"
+              autoFocus
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="var-level">
+                Difficulty rank{" "}
+                <span className="text-xs font-normal text-muted-foreground">
+                  (1 = easiest)
+                </span>
+              </Label>
+              <Input
+                id="var-level"
+                type="number"
+                min={1}
+                max={10}
+                value={form.difficultyLevel}
+                onChange={(e) =>
+                  update("difficultyLevel", Number(e.target.value) || 1)
+                }
+                className="tabular-nums"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="var-target">
+                Target{" "}
+                <span className="text-xs font-normal text-muted-foreground">
+                  ({unit})
+                </span>
+              </Label>
+              <Input
+                id="var-target"
+                type="number"
+                min={0}
+                value={form.targetValue}
+                onChange={(e) =>
+                  update("targetValue", Number(e.target.value) || 0)
+                }
+                placeholder="0 = none"
+                className="tabular-nums"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            <Star className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+            <span className="tabular-nums">
+              Difficulty stars preview:{" "}
+              <span className="text-amber-500">
+                {difficultyStars(Math.min(Math.max(form.difficultyLevel, 0), 5))}
+              </span>
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="var-desc">Description (optional)</Label>
+            <Textarea
+              id="var-desc"
+              value={form.description}
+              onChange={(e) => update("description", e.target.value)}
+              placeholder="Form cues, prerequisites, or coaching notes."
+              rows={2}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={pending || !form.name.trim()}>
+              {pending
+                ? "Saving…"
+                : context?.variant
+                  ? "Save variant"
+                  : "Add variant"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
