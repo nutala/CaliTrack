@@ -5,10 +5,10 @@ import {
   useWorkouts,
   useDeleteWorkout,
   useUpdateWorkout,
+  useCategoryMeta,
 } from "@/hooks/use-data";
 import { useAppStore } from "@/lib/store";
 import {
-  CATEGORY_META,
   type ExerciseCategory,
   type WorkoutFull,
   type WorkoutEntryFull,
@@ -177,14 +177,14 @@ export function HistoryView() {
   if (isLoading) {
     return (
       <div className="py-16 text-center text-sm text-muted-foreground">
-        Loading history…
+        Chargement de l'historique…
       </div>
     );
   }
   if (isError) {
     return (
       <div className="py-16 text-center text-sm text-destructive">
-        Failed to load workouts.
+        Échec du chargement des séances.
       </div>
     );
   }
@@ -193,14 +193,14 @@ export function HistoryView() {
       <div className="py-6">
         <EmptyState
           icon={History}
-          title="No workouts yet"
-          description="Log your first session to start tracking your progression."
+          title="Aucune séance pour le moment"
+          description="Enregistre ta première session pour commencer à suivre ta progression."
           action={
             <Button
               onClick={() => useAppStore.getState().setView("new-workout")}
             >
               <PlusCircle className="h-4 w-4" />
-              Log Workout
+              Nouvelle séance
             </Button>
           }
         />
@@ -223,8 +223,8 @@ export function HistoryView() {
       {workouts.length === 0 ? (
         <EmptyState
           icon={Search}
-          title="No matches"
-          description="Try a different title or exercise name."
+          title="Aucun résultat"
+          description="Essaie un autre titre ou nom d'exercice."
         />
       ) : (
         <div className="space-y-3">
@@ -236,7 +236,7 @@ export function HistoryView() {
                     {g.label}
                   </h3>
                   <span className="text-xs tabular-nums text-muted-foreground">
-                    {g.workouts.length} session
+                    {g.workouts.length} séance
                     {g.workouts.length > 1 ? "s" : ""}
                   </span>
                 </div>
@@ -287,25 +287,25 @@ function Toolbar({
         <Input
           value={search}
           onChange={(e) => onSearch(e.target.value)}
-          placeholder="Search title or exercise…"
+          placeholder="Rechercher un titre ou un exercice…"
           className="pl-9"
-          aria-label="Search workouts"
+          aria-label="Rechercher une séance"
         />
       </div>
       <div className="flex items-center justify-between gap-3 sm:justify-end">
         <span className="text-xs tabular-nums text-muted-foreground">
-          {showing}/{total} workouts
+          {showing}/{total} séances
         </span>
         <Select
           value={sort}
           onValueChange={(v) => onSort(v as "newest" | "oldest")}
         >
-          <SelectTrigger size="sm" className="w-[150px]" aria-label="Sort order">
+          <SelectTrigger size="sm" className="w-[150px]" aria-label="Ordre de tri">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="newest">Newest first</SelectItem>
-            <SelectItem value="oldest">Oldest first</SelectItem>
+            <SelectItem value="newest">Plus récent d'abord</SelectItem>
+            <SelectItem value="oldest">Plus ancien d'abord</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -357,7 +357,7 @@ function WorkoutCard({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="truncate text-sm font-semibold text-foreground">
-                {workout.title?.trim() || "Untitled session"}
+                {workout.title?.trim() || "Séance sans titre"}
               </span>
               <span className="hidden shrink-0 text-[11px] tabular-nums text-muted-foreground sm:inline">
                 · {relativeFromNow(workout.date)}
@@ -394,7 +394,7 @@ function WorkoutCard({
             size="icon"
             className="h-8 w-8 text-muted-foreground"
             onClick={onToggle}
-            aria-label={expanded ? "Collapse details" : "Expand details"}
+            aria-label={expanded ? "Replier les détails" : "Déplier les détails"}
           >
             {expanded ? (
               <ChevronDown className="h-4 w-4" />
@@ -434,7 +434,7 @@ function WorkoutCard({
               )}
 
               {workout.entries.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No entries.</p>
+                <p className="text-sm text-muted-foreground">Aucune entrée.</p>
               ) : (
                 <div className="space-y-2">
                   {workout.entries.map((entry) => (
@@ -494,7 +494,7 @@ function OverflowMenu({ workout }: { workout: WorkoutFull }) {
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-muted-foreground"
-            aria-label="Workout actions"
+            aria-label="Actions de la séance"
           >
             <MoreVertical className="h-4 w-4" />
           </Button>
@@ -502,11 +502,11 @@ function OverflowMenu({ workout }: { workout: WorkoutFull }) {
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => repeatWorkout(workout)}>
             <RefreshCw className="h-4 w-4" />
-            Repeat workout
+            Refaire la séance
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setEditOpen(true)}>
             <Pencil className="h-4 w-4" />
-            Edit
+            Modifier
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -514,7 +514,7 @@ function OverflowMenu({ workout }: { workout: WorkoutFull }) {
             onSelect={() => setDeleteOpen(true)}
           >
             <Trash2 className="h-4 w-4" />
-            Delete
+            Supprimer
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -538,8 +538,9 @@ function OverflowMenu({ workout }: { workout: WorkoutFull }) {
 /* ------------------------------------------------------------------ */
 
 function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
+  const getCatMeta = useCategoryMeta();
   const cat = (entry.exercise.category as ExerciseCategory) || "Push";
-  const meta = CATEGORY_META[cat] ?? CATEGORY_META.Push;
+  const meta = getCatMeta(cat);
   const isStatic = entry.exercise.isStatic;
   const unit = metricUnit(isStatic);
   const totalSets = entry.sets.length;
@@ -580,7 +581,7 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
             variant="outline"
             className="ml-auto gap-1 border-transparent text-[10px] font-bold"
             style={{ backgroundColor: `${ssColor}22`, color: ssColor }}
-            title="Part of a superset"
+            title="Fait partie d'un superset"
           >
             <Link2 className="h-3 w-3" />
             Superset {ssLabel}
@@ -599,9 +600,9 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
           <table className="w-full text-xs tabular-nums">
             <thead>
               <tr className="text-left text-muted-foreground">
-                <th className="py-1 pr-3 font-medium">Set</th>
+                <th className="py-1 pr-3 font-medium">Série</th>
                 <th className="py-1 pr-3 font-medium">
-                  {isStatic ? "Hold" : "Reps"}
+                  {isStatic ? "Maintien" : "Reps"}
                 </th>
                 <th className="py-1 pr-3 font-medium">kg</th>
                 <th className="py-1 font-medium">RPE</th>
@@ -631,12 +632,12 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
       )}
 
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] tabular-nums text-muted-foreground">
-        <span>{totalSets} sets</span>
+        <span>{totalSets} séries</span>
         <span aria-hidden>·</span>
         <span>{fmtCompact(totalVol)} vol</span>
         <span aria-hidden>·</span>
         <span>
-          best {best} {unit}
+          meilleure {best} {unit}
         </span>
       </div>
     </div>
@@ -699,20 +700,20 @@ function EditDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit workout</DialogTitle>
+          <DialogTitle>Modifier la séance</DialogTitle>
           <DialogDescription>
-            Update session metadata. Sets and entries are not editable here.
+            Mets à jour les métadonnées de la séance. Les séries et entrées ne sont pas modifiables ici.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="hw-title">Title</Label>
+            <Label htmlFor="hw-title">Titre</Label>
             <Input
               id="hw-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Untitled session"
+              placeholder="Séance sans titre"
             />
           </div>
 
@@ -727,7 +728,7 @@ function EditDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="hw-duration">Duration (min)</Label>
+              <Label htmlFor="hw-duration">Durée (min)</Label>
               <Input
                 id="hw-duration"
                 type="number"
@@ -742,7 +743,7 @@ function EditDialog({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Perceived exertion (RPE)</Label>
+              <Label>Effort perçu (RPE)</Label>
               <span
                 className={cn(
                   "text-sm font-semibold tabular-nums",
@@ -758,12 +759,12 @@ function EditDialog({
               step={1}
               value={[pe]}
               onValueChange={(v) => setPe(v[0] ?? 5)}
-              aria-label="Perceived exertion"
+              aria-label="Effort perçu"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="hw-bw">Bodyweight (kg)</Label>
+            <Label htmlFor="hw-bw">Poids du corps (kg)</Label>
             <Input
               id="hw-bw"
               type="number"
@@ -782,7 +783,7 @@ function EditDialog({
               id="hw-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="How did it feel?"
+              placeholder="Comment était la séance ?"
               rows={3}
             />
           </div>
@@ -794,10 +795,10 @@ function EditDialog({
               onClick={() => onOpenChange(false)}
               disabled={update.isPending}
             >
-              Cancel
+              Annuler
             </Button>
             <Button type="submit" disabled={update.isPending}>
-              {update.isPending ? "Saving…" : "Save changes"}
+              {update.isPending ? "Enregistrement…" : "Enregistrer"}
             </Button>
           </DialogFooter>
         </form>
@@ -825,13 +826,13 @@ function DeleteDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete this workout?</AlertDialogTitle>
+          <AlertDialogTitle>Supprimer cette séance ?</AlertDialogTitle>
           <AlertDialogDescription>
-            This cannot be undone.
+            Action irréversible.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={del.isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={del.isPending}>Annuler</AlertDialogCancel>
           <AlertDialogAction
             className={cn(buttonVariants({ variant: "destructive" }))}
             disabled={del.isPending}
@@ -841,7 +842,7 @@ function DeleteDialog({
               })
             }
           >
-            {del.isPending ? "Deleting…" : "Delete"}
+            {del.isPending ? "Suppression…" : "Supprimer"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

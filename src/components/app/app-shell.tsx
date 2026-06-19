@@ -12,15 +12,16 @@ import {
 import { useAppStore, type ViewId } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/app/theme-toggle";
+import { UserMenu } from "@/components/app/user-menu";
 import { RestTimerWidget } from "@/components/app/rest-timer-widget";
 import { Button } from "@/components/ui/button";
 
 const NAV: { id: ViewId; label: string; icon: React.ComponentType<{ className?: string }>; short: string }[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, short: "Home" },
-  { id: "exercises", label: "Exercises", icon: Dumbbell, short: "Exos" },
-  { id: "new-workout", label: "New Workout", icon: PlusCircle, short: "Log" },
-  { id: "history", label: "History", icon: History, short: "Past" },
-  { id: "stats", label: "Stats", icon: BarChart3, short: "Stats" },
+  { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard, short: "Accueil" },
+  { id: "exercises", label: "Exercices", icon: Dumbbell, short: "Exos" },
+  { id: "new-workout", label: "Nouvelle séance", icon: PlusCircle, short: "Séance" },
+  { id: "history", label: "Historique", icon: History, short: "Passé" },
+  { id: "stats", label: "Statistiques", icon: BarChart3, short: "Stats" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -35,7 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button
             onClick={() => setView("dashboard")}
             className="flex items-center gap-2.5 group"
-            aria-label="Go to dashboard"
+            aria-label="Aller au tableau de bord"
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform group-hover:scale-105">
               <Activity className="h-5 w-5" />
@@ -45,13 +46,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 CalisTrack
               </span>
               <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Calisthenics
+                Calisthénie
               </span>
             </div>
           </button>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1" aria-label="Main">
+          <nav className="hidden md:flex items-center gap-1" aria-label="Navigation principale">
             {NAV.map((item) => {
               const active = view === item.id;
               const Icon = item.icon;
@@ -81,16 +82,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className="hidden sm:inline-flex gap-2"
             >
               <PlusCircle className="h-4 w-4" />
-              Log Workout
+              Nouvelle séance
             </Button>
             <ThemeToggle />
+            <UserMenu />
           </div>
         </div>
 
         {/* Mobile nav (scrollable pill bar) */}
         <nav
           className="md:hidden flex items-center gap-1 overflow-x-auto px-3 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          aria-label="Mobile"
+          aria-label="Navigation mobile"
         >
           {NAV.map((item) => {
             const active = view === item.id;
@@ -130,10 +132,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Activity className="h-3.5 w-3.5" />
               <span className="font-medium">CalisTrack</span>
               <span className="opacity-60">·</span>
-              <span>Calisthenics Performance Tracker</span>
+              <span>Suivi de performance calisthénie</span>
             </p>
             <p className="opacity-70">
-              Built for athletes chasing the full planche. 💪
+              Conçu pour les athlètes qui visent la full planche. 💪
             </p>
           </div>
         </div>

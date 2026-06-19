@@ -25,11 +25,7 @@ import {
   Trophy,
 } from "lucide-react";
 
-import {
-  CATEGORY_META,
-  type ExerciseCategory,
-  type ExerciseWithVariants,
-} from "@/lib/types";
+import { type ExerciseWithVariants } from "@/lib/types";
 import {
   difficultyStars,
   fmtCompact,
@@ -38,12 +34,14 @@ import {
   relativeFromNow,
 } from "@/lib/calc";
 import {
+  useCategoryMeta,
   useExercises,
   useOverview,
   useProgress,
   useTopExercises,
   useWorkouts,
 } from "@/hooks/use-data";
+import { useSession } from "next-auth/react";
 import { useAppStore } from "@/lib/store";
 import {
   EmptyState,
@@ -59,8 +57,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ChartContainer,
   ChartTooltip,
@@ -76,6 +76,10 @@ import { cn } from "@/lib/utils";
 export function DashboardView() {
   return (
     <div className="space-y-8">
+      <FadeIn>
+        <WelcomeCard />
+      </FadeIn>
+
       <FadeIn>
         <KpiGrid />
       </FadeIn>
@@ -102,6 +106,74 @@ export function DashboardView() {
         </div>
       </FadeIn>
     </div>
+  );
+}
+
+// =====================================================
+// 0. Welcome card (auth-aware)
+// =====================================================
+
+function WelcomeCard() {
+  const { data: session, status } = useSession();
+
+  if (status === "loading") {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-4 p-4">
+          <Skeleton className="h-12 w-12 rounded-full" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-3 w-64" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (status === "unauthenticated" || !session?.user) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="p-4">
+          <p className="text-sm text-muted-foreground">
+            Connecte-toi via le bouton en haut à droite pour synchroniser tes
+            séances sur ton compte.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const name =
+    session.user.name ?? session.user.email ?? "Athlète";
+  const initials = name
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-4 p-4">
+        <Avatar className="h-12 w-12">
+          {session.user.image ? (
+            <AvatarImage src={session.user.image} alt={name} />
+          ) : null}
+          <AvatarFallback>{initials || "?"}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-foreground">
+            Bienvenue, {name} 👋
+          </p>
+          {session.user.email && (
+            <p className="truncate text-xs text-muted-foreground">
+              {session.user.email}
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -149,35 +221,35 @@ function KpiGrid() {
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       <StatCard
-        label="Total Workouts"
+        label="Séances totales"
         value={data.totalWorkouts}
         icon={Dumbbell}
         hint={
           data.lastWorkoutDate
-            ? `Last: ${relativeFromNow(data.lastWorkoutDate)}`
-            : "No workouts yet"
+            ? `Dernière : ${relativeFromNow(data.lastWorkoutDate)}`
+            : "Aucune séance pour le moment"
         }
       />
       <StatCard
-        label="Current Streak"
+        label="Série actuelle"
         value={data.currentStreakDays}
-        unit="days"
+        unit="jours"
         icon={Flame}
         accent={streakPositive ? "success" : "default"}
-        hint={`Longest: ${data.longestStreakDays}d`}
+        hint={`Plus longue : ${data.longestStreakDays} j`}
       />
       <StatCard
-        label="This Week"
+        label="Cette semaine"
         value={data.thisWeekCount}
-        unit="sessions"
+        unit="séances"
         icon={CalendarDays}
-        hint={`${data.totalSets} sets all-time`}
+        hint={`${data.totalSets} séries au total`}
       />
       <StatCard
-        label="Total Volume"
+        label="Volume total"
         value={fmtCompact(data.totalVolume)}
         icon={TrendingUp}
-        hint="reps + holds"
+        hint="reps + maintiens"
       />
     </div>
   );
@@ -251,13 +323,13 @@ function ProgressTracker() {
 
   const chartConfig: ChartConfig = {
     ex1: {
-      label: ex1?.name ?? "Exercise 1",
+      label: ex1?.name ?? "Exercice 1",
       color: "var(--chart-1)",
     },
     ...(hasEx2
       ? {
           ex2: {
-            label: ex2?.name ?? "Exercise 2",
+            label: ex2?.name ?? "Exercice 2",
             color: "var(--chart-2)",
           },
         }
@@ -294,9 +366,9 @@ function ProgressTracker() {
             <Activity className="h-4 w-4" />
           </div>
           <div>
-            <CardTitle>Progress Tracker</CardTitle>
+            <CardTitle>Suivi de progression</CardTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Best performance per workout over time.
+              Meilleure performance par séance dans le temps.
             </p>
           </div>
         </div>
@@ -306,13 +378,13 @@ function ProgressTracker() {
         {/* Control row */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <LabeledSelect
-            label="Exercise 1"
+            label="Exercice 1"
             value={effectiveEx1Id}
             onValueChange={(v) => {
               setEx1Id(v);
               setEx1VariantId(ALL_VARIANTS);
             }}
-            placeholder="Select…"
+            placeholder="Sélectionner…"
           >
             {exercises.map((e) => (
               <SelectItem key={e.id} value={e.id}>
@@ -323,11 +395,11 @@ function ProgressTracker() {
 
           {ex1 && (
             <LabeledSelect
-              label="Variant 1"
+              label="Variante 1"
               value={effectiveEx1VariantId}
               onValueChange={setEx1VariantId}
             >
-              <SelectItem value={ALL_VARIANTS}>All variants</SelectItem>
+              <SelectItem value={ALL_VARIANTS}>Toutes les variantes</SelectItem>
               {ex1.variants.map((v) => (
                 <SelectItem key={v.id} value={v.id}>
                   {v.name}
@@ -337,14 +409,14 @@ function ProgressTracker() {
           )}
 
           <LabeledSelect
-            label="Exercise 2 (optional)"
+            label="Exercice 2 (optionnel)"
             value={ex2Id || "__none__"}
             onValueChange={(v) => {
               setEx2Id(v === "__none__" ? "" : v);
               setEx2VariantId(ALL_VARIANTS);
             }}
           >
-            <SelectItem value="__none__">None</SelectItem>
+            <SelectItem value="__none__">Aucun</SelectItem>
             {exercises
               .filter((e) => e.id !== effectiveEx1Id)
               .map((e) => (
@@ -356,11 +428,11 @@ function ProgressTracker() {
 
           {ex2 && (
             <LabeledSelect
-              label="Variant 2"
+              label="Variante 2"
               value={effectiveEx2VariantId}
               onValueChange={setEx2VariantId}
             >
-              <SelectItem value={ALL_VARIANTS}>All variants</SelectItem>
+              <SelectItem value={ALL_VARIANTS}>Toutes les variantes</SelectItem>
               {ex2.variants.map((v) => (
                 <SelectItem key={v.id} value={v.id}>
                   {v.name}
@@ -455,11 +527,11 @@ function ProgressTracker() {
         ) : (
           <EmptyState
             icon={Activity}
-            title="No progress data yet"
+            title="Pas encore de données de progression"
             description={
               ex1
-                ? `Log a workout with "${ex1.name}" to start tracking your progression here.`
-                : "Pick an exercise to start tracking your progression."
+                ? `Enregistre une séance avec « ${ex1.name} » pour suivre ta progression ici.`
+                : "Choisis un exercice pour commencer à suivre ta progression."
             }
             className="min-h-[200px]"
           />
@@ -504,12 +576,13 @@ function LabeledSelect({
 function TopExercises() {
   const { data, isLoading } = useTopExercises();
   const exercisesMap = useExercisesMap();
+  const getCatMeta = useCategoryMeta();
 
   return (
     <div>
       <SectionHeading
-        title="Top Exercises"
-        subtitle="Most-performed moves recently"
+        title="Exercices favoris"
+        subtitle="Exercices les plus pratiqués récemment"
       />
       {isLoading ? (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -527,8 +600,8 @@ function TopExercises() {
           <CardContent className="py-10">
             <EmptyState
               icon={Trophy}
-              title="No exercises tracked yet"
-              description="Log your first workout to see your top moves here."
+              title="Aucun exercice suivi pour le moment"
+              description="Enregistre ta première séance pour voir tes exercices favoris ici."
             />
           </CardContent>
         </Card>
@@ -536,7 +609,7 @@ function TopExercises() {
         <ScrollArea className="w-full pb-2">
           <div className="flex gap-3 overflow-x-auto pb-1">
             {data.map((te) => {
-              const cat = CATEGORY_META[te.category as ExerciseCategory];
+              const cat = getCatMeta(te.category);
               const ex = exercisesMap.get(te.exerciseId);
               const variant = ex?.variants.find(
                 (v) => v.name === te.topVariantName,
@@ -556,26 +629,26 @@ function TopExercises() {
                         variant="secondary"
                         className="shrink-0 gap-1 border-transparent text-white"
                         style={{
-                          backgroundColor: cat?.color ?? "#6b7280",
+                          backgroundColor: cat.color,
                         }}
                       >
-                        <span>{cat?.emoji}</span>
+                        <span>{cat.emoji}</span>
                         <span className="hidden sm:inline">
-                          {cat?.label ?? te.category}
+                          {cat.label}
                         </span>
                       </Badge>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
-                        <div className="text-muted-foreground">Sessions</div>
+                        <div className="text-muted-foreground">Séances</div>
                         <div className="text-base font-semibold tabular-nums text-foreground">
                           {te.sessions}
                         </div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">
-                          Best ({metricUnit(te.isStatic)})
+                          Meilleur ({metricUnit(te.isStatic)})
                         </div>
                         <div className="text-base font-semibold tabular-nums text-foreground">
                           {te.bestValue}
@@ -585,19 +658,19 @@ function TopExercises() {
 
                     <div className="space-y-1 border-t border-border/60 pt-2 text-xs">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-muted-foreground">Top variant</span>
+                        <span className="text-muted-foreground">Variante max</span>
                         <span className="truncate font-medium text-foreground">
                           {te.topVariantName ?? "Standard"}
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-muted-foreground">Difficulty</span>
+                        <span className="text-muted-foreground">Difficulté</span>
                         <span className="text-amber-500">
                           {difficultyStars(level || 3)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-muted-foreground">Last done</span>
+                        <span className="text-muted-foreground">Dernière fois</span>
                         <span className="font-medium text-foreground">
                           {relativeFromNow(te.lastPerformed)}
                         </span>
@@ -636,8 +709,8 @@ function RecentWorkouts() {
   return (
     <div>
       <SectionHeading
-        title="Recent Workouts"
-        subtitle="Your latest sessions"
+        title="Séances récentes"
+        subtitle="Tes dernières sessions"
       />
       <Card className="gap-0">
         <CardContent className="p-0">
@@ -654,8 +727,8 @@ function RecentWorkouts() {
             <div className="p-4">
               <EmptyState
                 icon={CalendarDays}
-                title="No workouts yet"
-                description="Your logged sessions will show up here."
+                title="Aucune séance pour le moment"
+                description="Tes séances enregistrées apparaîtront ici."
               />
             </div>
           ) : (
@@ -683,17 +756,17 @@ function RecentWorkouts() {
 
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-foreground">
-                          {w.title || "Untitled"}
+                          {w.title || "Séance sans titre"}
                         </div>
                         <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                           <span>{fmtDate(w.date)}</span>
                           <span aria-hidden>·</span>
                           <span className="tabular-nums">
                             {w.entries.length}{" "}
-                            {w.entries.length === 1 ? "entry" : "entries"}
+                            {w.entries.length === 1 ? "entrée" : "entrées"}
                           </span>
                           <span aria-hidden>·</span>
-                          <span className="tabular-nums">{totalSets} sets</span>
+                          <span className="tabular-nums">{totalSets} séries</span>
                         </div>
                       </div>
 
@@ -713,7 +786,7 @@ function RecentWorkouts() {
             onClick={() => setView("history")}
             className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            View all →
+            Tout voir →
           </button>
         </div>
       )}
@@ -742,9 +815,9 @@ function ActivityStrip() {
             <CalendarDays className="h-4 w-4" />
           </div>
           <div>
-            <CardTitle>Activity</CardTitle>
+            <CardTitle>Activité</CardTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Last 30 days · volume per day
+              30 derniers jours · volume par jour
             </p>
           </div>
         </div>
@@ -753,8 +826,8 @@ function ActivityStrip() {
         {calendar.length === 0 ? (
           <EmptyState
             icon={CalendarDays}
-            title="No activity yet"
-            description="Your recent workout volume will appear here."
+            title="Aucune activité pour le moment"
+            description="Le volume de tes séances récentes apparaîtra ici."
           />
         ) : (
           <div
@@ -804,16 +877,17 @@ function activityColorClass(volume: number, max: number): string {
 
 function VolumeByCategory() {
   const { data } = useOverview();
+  const getCatMeta = useCategoryMeta();
   const slices = (data?.volumeByCategory ?? []).filter((s) => s.volume > 0);
 
   const totalVolume = slices.reduce((acc, s) => acc + s.volume, 0);
 
   const chartConfig: ChartConfig = {};
   for (const s of slices) {
-    const meta = CATEGORY_META[s.category as ExerciseCategory];
+    const meta = getCatMeta(s.category);
     chartConfig[s.category] = {
-      label: meta?.label ?? s.category,
-      color: meta?.color ?? "#6b7280",
+      label: meta.label,
+      color: meta.color,
     };
   }
 
@@ -825,9 +899,9 @@ function VolumeByCategory() {
             <BarChart3 className="h-4 w-4" />
           </div>
           <div>
-            <CardTitle>Volume by Category</CardTitle>
+            <CardTitle>Volume par catégorie</CardTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Distribution across muscle groups
+              Répartition par groupes musculaires
             </p>
           </div>
         </div>
@@ -836,8 +910,8 @@ function VolumeByCategory() {
         {slices.length === 0 ? (
           <EmptyState
             icon={BarChart3}
-            title="No category data"
-            description="Log workouts to break down volume by category."
+            title="Pas encore de données"
+            description="Enregistre des séances pour voir le volume par catégorie."
           />
         ) : (
           <div className="grid items-center gap-4 sm:grid-cols-2">
@@ -865,13 +939,11 @@ function VolumeByCategory() {
                     strokeWidth={0}
                   >
                     {slices.map((s) => {
-                      const meta = CATEGORY_META[
-                        s.category as ExerciseCategory
-                      ];
+                      const meta = getCatMeta(s.category);
                       return (
                         <Cell
                           key={s.category}
-                          fill={meta?.color ?? "#6b7280"}
+                          fill={meta.color}
                         />
                       );
                     })}
@@ -893,7 +965,7 @@ function VolumeByCategory() {
                 .slice()
                 .sort((a, b) => b.volume - a.volume)
                 .map((s) => {
-                  const meta = CATEGORY_META[s.category as ExerciseCategory];
+                  const meta = getCatMeta(s.category);
                   const pct =
                     totalVolume > 0
                       ? Math.round((s.volume / totalVolume) * 100)
@@ -905,10 +977,10 @@ function VolumeByCategory() {
                     >
                       <span
                         className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
-                        style={{ backgroundColor: meta?.color ?? "#6b7280" }}
+                        style={{ backgroundColor: meta.color }}
                       />
                       <span className="flex-1 truncate text-foreground">
-                        {meta?.emoji} {meta?.label ?? s.category}
+                        {meta.emoji} {meta.label}
                       </span>
                       <span className="text-muted-foreground tabular-nums">
                         {fmtCompact(s.volume)}

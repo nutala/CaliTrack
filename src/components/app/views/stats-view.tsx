@@ -24,7 +24,6 @@ import {
 } from "recharts";
 
 import {
-  CATEGORY_META,
   type ExerciseCategory,
   type OverviewStats,
   type TopExercise,
@@ -36,7 +35,12 @@ import {
   metricUnit,
   difficultyStars,
 } from "@/lib/calc";
-import { useOverview, useTopExercises, useWorkouts } from "@/hooks/use-data";
+import {
+  useOverview,
+  useTopExercises,
+  useWorkouts,
+  useCategoryMeta,
+} from "@/hooks/use-data";
 import {
   StatCard,
   StatCardSkeleton,
@@ -73,11 +77,11 @@ const volumeChartConfig: ChartConfig = {
 };
 
 const donutChartConfig: ChartConfig = {
-  sessions: { label: "Sessions" },
+  sessions: { label: "Séances" },
 };
 
 const frequencyChartConfig: ChartConfig = {
-  count: { label: "Workouts", color: "var(--chart-1)" },
+  count: { label: "Séances", color: "var(--chart-1)" },
 };
 
 const trendChartConfig: ChartConfig = {
@@ -111,6 +115,7 @@ export function StatsView() {
   const overviewQ = useOverview();
   const topQ = useTopExercises();
   const workoutsQ = useWorkouts();
+  const getCatMeta = useCategoryMeta();
 
   const overview = overviewQ.data;
   const overviewLoading = overviewQ.isLoading;
@@ -120,16 +125,16 @@ export function StatsView() {
     if (!overview) return [];
     return overview.volumeByCategory.map((c) => {
       const cat = c.category as ExerciseCategory;
-      const meta = CATEGORY_META[cat];
+      const meta = getCatMeta(cat);
       return {
         category: c.category,
-        label: meta?.label ?? c.category,
+        label: meta.label,
         volume: c.volume,
         sessions: c.sessions,
-        color: meta?.color ?? "var(--chart-1)",
+        color: meta.color,
       };
     });
-  }, [overview]);
+  }, [overview, getCatMeta]);
 
   const totalSessions = React.useMemo(
     () => volumeByCat.reduce((acc, c) => acc + c.sessions, 0),
@@ -186,8 +191,8 @@ export function StatsView() {
   return (
     <div className="space-y-8">
       <SectionHeading
-        title="Analytics"
-        subtitle="Deep-dive into your training volume, consistency and personal records."
+        title="Statistiques"
+        subtitle="Analyse détaillée de ton volume d'entraînement, de ta régularité et de tes records personnels."
       />
 
       {/* 1. Consistency header strip */}
@@ -202,34 +207,34 @@ export function StatsView() {
         ) : (
           <>
             <StatCard
-              label="Current Streak"
+              label="Série actuelle"
               value={overview.currentStreakDays}
-              unit="days"
+              unit="jours"
               icon={Flame}
               accent="success"
-              hint="Consecutive training days"
+              hint="Jours consécutifs d'entraînement"
             />
             <StatCard
-              label="Longest Streak"
+              label="Plus longue série"
               value={overview.longestStreakDays}
-              unit="days"
+              unit="jours"
               icon={Trophy}
-              hint="Personal best"
+              hint="Record personnel"
             />
             <StatCard
-              label="This Week"
+              label="Cette semaine"
               value={overview.thisWeekCount}
-              unit="sessions"
+              unit="séances"
               icon={CalendarDays}
-              hint="Last 7 days"
+              hint="7 derniers jours"
             />
             <StatCard
-              label="Avg Exertion"
+              label="Effort moyen"
               value={overview.avgExertion ?? "—"}
               unit={overview.avgExertion != null ? "/10" : undefined}
               icon={Target}
               accent="warning"
-              hint="Perceived effort"
+              hint="Effort perçu"
             />
           </>
         )}
@@ -242,10 +247,10 @@ export function StatsView() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              Volume by Category
+              Volume par catégorie
             </CardTitle>
             <CardDescription>
-              Total training volume · last 30 days
+              Volume total d'entraînement · 30 derniers jours
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -253,8 +258,8 @@ export function StatsView() {
               <Skeleton className="h-[260px] w-full" />
             ) : volumeByCat.length === 0 ? (
               <EmptyState
-                title="No volume data"
-                description="Log workouts in the last 30 days to populate this chart."
+                title="Pas de données de volume"
+                description="Enregistre des séances dans les 30 derniers jours pour remplir ce graphique."
               />
             ) : (
               <ChartContainer
@@ -312,10 +317,10 @@ export function StatsView() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-4 w-4 text-muted-foreground" />
-              Category Distribution
+              Répartition par catégorie
             </CardTitle>
             <CardDescription>
-              Sessions per category · last 30 days
+              Séances par catégorie · 30 derniers jours
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -323,8 +328,8 @@ export function StatsView() {
               <Skeleton className="h-[260px] w-full" />
             ) : volumeByCat.length === 0 ? (
               <EmptyState
-                title="No data"
-                description="No recent workouts to break down."
+                title="Pas de données"
+                description="Aucune séance récente à ventiler."
               />
             ) : (
               <div className="relative h-[260px] w-full">
@@ -345,7 +350,7 @@ export function StatsView() {
                                   {String(name)}
                                 </span>
                                 <span className="font-mono font-medium tabular-nums">
-                                  {n} session{n === 1 ? "" : "s"}
+                                  {n} séance{n === 1 ? "" : "s"}
                                 </span>
                               </div>
                             );
@@ -373,7 +378,7 @@ export function StatsView() {
                     {totalSessions}
                   </span>
                   <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                    sessions
+                    séances
                   </span>
                 </div>
               </div>
@@ -386,17 +391,17 @@ export function StatsView() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              Workout Frequency
+              Fréquence d'entraînement
             </CardTitle>
             <CardDescription>
-              Daily workout count · last 30 days
+              Nombre de séances par jour · 30 derniers jours
             </CardDescription>
           </CardHeader>
           <CardContent>
             {overviewLoading || !overview ? (
               <Skeleton className="h-[260px] w-full" />
             ) : frequencyData.length === 0 ? (
-              <EmptyState title="No data" />
+              <EmptyState title="Pas de données" />
             ) : (
               <ChartContainer
                 config={frequencyChartConfig}
@@ -437,7 +442,7 @@ export function StatsView() {
                                 )}
                               </span>
                               <span className="font-mono font-medium tabular-nums">
-                                {n} workout{n === 1 ? "" : "s"}
+                                {n} séance{n === 1 ? "" : "s"}
                               </span>
                             </div>
                           );
@@ -461,17 +466,17 @@ export function StatsView() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Flame className="h-4 w-4 text-muted-foreground" />
-              Activity Heatmap
+              Carte d'activité
             </CardTitle>
             <CardDescription>
-              Training volume intensity · last 30 days
+              Intensité du volume d'entraînement · 30 derniers jours
             </CardDescription>
           </CardHeader>
           <CardContent>
             {overviewLoading || !overview ? (
               <Skeleton className="h-[200px] w-full" />
             ) : overview.activityCalendar.length === 0 ? (
-              <EmptyState title="No data" />
+              <EmptyState title="Pas de données" />
             ) : (
               <Heatmap data={overview} maxVol={heatmapMax} />
             )}
@@ -482,12 +487,12 @@ export function StatsView() {
       {/* 6. Personal Records */}
       <div>
         <SectionHeading
-          title="Personal Records"
-          subtitle="Top exercises ranked by best single-set performance."
+          title="Records personnels"
+          subtitle="Exercices classés par meilleure performance sur une seule série."
           action={
             topExercises.length > 0 ? (
               <Badge variant="secondary" className="tabular-nums">
-                {topExercises.length} exercises
+                {topExercises.length} exercice{topExercises.length > 1 ? "s" : ""}
               </Badge>
             ) : undefined
           }
@@ -503,29 +508,29 @@ export function StatsView() {
             ) : topExercises.length === 0 ? (
               <EmptyState
                 icon={Award}
-                title="No PRs yet"
-                description="Log workouts with sets to populate your personal records."
+                title="Aucun record pour le moment"
+                description="Enregistre des séances avec des séries pour remplir tes records personnels."
               />
             ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Exercise</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Sessions</TableHead>
-                      <TableHead className="text-right">Best Set</TableHead>
-                      <TableHead>Top Variant</TableHead>
+                      <TableHead>Exercice</TableHead>
+                      <TableHead>Catégorie</TableHead>
+                      <TableHead className="text-right">Séances</TableHead>
+                      <TableHead className="text-right">Meilleure série</TableHead>
+                      <TableHead>Variante max</TableHead>
                       <TableHead className="text-right">
-                        Last Performed
+                        Dernière fois
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {topExercises.map((ex) => {
                       const cat = ex.category as ExerciseCategory;
-                      const meta = CATEGORY_META[cat];
-                      const color = meta?.color ?? "var(--chart-1)";
+                      const meta = getCatMeta(cat);
+                      const color = meta.color;
                       const isHex = color.startsWith("#");
                       const bgTint = isHex
                         ? hexWithAlpha(color, 0.12)
@@ -553,8 +558,8 @@ export function StatsView() {
                                 color,
                               }}
                             >
-                              {meta?.emoji ? <span>{meta.emoji}</span> : null}
-                              {meta?.label ?? ex.category}
+                              {meta.emoji ? <span>{meta.emoji}</span> : null}
+                              {meta.label}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
@@ -600,17 +605,17 @@ export function StatsView() {
       {trendData.length > 0 && (
         <div>
           <SectionHeading
-            title="Volume Trend"
-            subtitle="Total volume per workout over time."
+            title="Tendance du volume"
+            subtitle="Volume total par séance dans le temps."
           />
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                Per-workout Volume
+                Volume par séance
               </CardTitle>
               <CardDescription>
-                Sum of reps / hold seconds across all sets in each workout
+                Somme des reps / secondes de maintien sur toutes les séries de chaque séance
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -697,7 +702,7 @@ function Heatmap({
             return (
               <div
                 key={d.date}
-                title={`${dateLabel} · ${fmtCompact(vol)} volume · ${d.count} workout${d.count === 1 ? "" : "s"}`}
+                title={`${dateLabel} · ${fmtCompact(vol)} volume · ${d.count} séance${d.count === 1 ? "" : "s"}`}
                 className={`h-9 w-full rounded-[5px] transition-shadow hover:ring-2 hover:ring-ring/40 ${cls}`}
               />
             );
@@ -705,12 +710,12 @@ function Heatmap({
         </div>
       </div>
       <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
-        <span>Less</span>
+        <span>Moins</span>
         <span className="h-3 w-3 rounded-[3px] bg-muted/40" />
         <span className="h-3 w-3 rounded-[3px] bg-emerald-500/40" />
         <span className="h-3 w-3 rounded-[3px] bg-emerald-500/70" />
         <span className="h-3 w-3 rounded-[3px] bg-emerald-500" />
-        <span>More</span>
+        <span>Plus</span>
       </div>
     </div>
   );

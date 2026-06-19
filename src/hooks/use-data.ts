@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import {
   useMutation,
   useQuery,
@@ -14,7 +15,9 @@ import type {
   TopExercise,
   ProgressPoint,
   Exercise,
+  Category,
 } from "@/lib/types";
+import { CATEGORY_META } from "@/lib/types";
 
 /** ----- Exercises ----- */
 export function useExercises() {
@@ -32,7 +35,7 @@ export function useCreateExercise() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.exercises });
       qc.invalidateQueries({ queryKey: qk.overview });
-      toast.success("Exercise created");
+      toast.success("Exercice créé");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -50,7 +53,7 @@ export function useUpdateExercise() {
     }) => api.patch<ExerciseWithVariants>(`/api/exercises/${id}`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.exercises });
-      toast.success("Exercise updated");
+      toast.success("Exercice mis à jour");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -64,7 +67,7 @@ export function useDeleteExercise() {
       qc.invalidateQueries({ queryKey: qk.exercises });
       qc.invalidateQueries({ queryKey: qk.overview });
       qc.invalidateQueries({ queryKey: qk.topExercises });
-      toast.success("Exercise deleted");
+      toast.success("Exercice supprimé");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -84,11 +87,10 @@ export function useAddVariant() {
         description?: string;
         targetValue?: number;
       };
-    }) =>
-      api.post(`/api/exercises/${exerciseId}/variants`, body),
+    }) => api.post(`/api/exercises/${exerciseId}/variants`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.exercises });
-      toast.success("Variant added");
+      toast.success("Variante ajoutée");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -106,7 +108,7 @@ export function useUpdateVariant() {
     }) => api.patch(`/api/variants/${id}`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.exercises });
-      toast.success("Variant updated");
+      toast.success("Variante mise à jour");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -118,7 +120,7 @@ export function useDeleteVariant() {
     mutationFn: (id: string) => api.delete(`/api/variants/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.exercises });
-      toast.success("Variant removed");
+      toast.success("Variante supprimée");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -163,7 +165,7 @@ export function useCreateWorkout() {
       qc.invalidateQueries({ queryKey: qk.overview });
       qc.invalidateQueries({ queryKey: qk.topExercises });
       qc.invalidateQueries({ queryKey: ["stats", "progress"] });
-      toast.success("Workout logged 🎉");
+      toast.success("Séance enregistrée 🎉");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -182,7 +184,7 @@ export function useUpdateWorkout() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.workouts });
       qc.invalidateQueries({ queryKey: qk.overview });
-      toast.success("Workout updated");
+      toast.success("Séance mise à jour");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -196,7 +198,7 @@ export function useDeleteWorkout() {
       qc.invalidateQueries({ queryKey: qk.workouts });
       qc.invalidateQueries({ queryKey: qk.overview });
       qc.invalidateQueries({ queryKey: qk.topExercises });
-      toast.success("Workout deleted");
+      toast.success("Séance supprimée");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -231,4 +233,100 @@ export function useProgress(exerciseId?: string, variantId?: string | null) {
     },
     enabled: !!exerciseId,
   });
+}
+
+/** ----- Categories ----- */
+export function useCategories() {
+  return useQuery<Category[]>({
+    queryKey: qk.categories,
+    queryFn: () => api.get<Category[]>("/api/categories"),
+  });
+}
+
+export function useCreateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      name: string;
+      label?: string;
+      color?: string;
+      emoji?: string;
+    }) => api.post<Category>("/api/categories", body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.categories });
+      toast.success("Catégorie créée");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useUpdateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: Record<string, unknown>;
+    }) => api.patch<Category>(`/api/categories/${id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.categories });
+      qc.invalidateQueries({ queryKey: qk.exercises });
+      toast.success("Catégorie mise à jour");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      reassign,
+    }: {
+      id: string;
+      reassign?: string;
+    }) =>
+      api.delete(
+        `/api/categories/${id}${reassign ? `?reassign=${encodeURIComponent(reassign)}` : ""}`,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.categories });
+      qc.invalidateQueries({ queryKey: qk.exercises });
+      toast.success("Catégorie supprimée");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+/**
+ * Returns a lookup function `(categoryName) => { label, color, emoji }`
+ * built from the user's dynamic categories, falling back to the static
+ * CATEGORY_META, then to a neutral default.
+ */
+export function useCategoryMeta() {
+  const { data: categories } = useCategories();
+  const dynamicMap = React.useMemo(() => {
+    const m = new Map<string, { label: string; color: string; emoji: string }>();
+    for (const c of categories ?? []) {
+      m.set(c.name, { label: c.label, color: c.color, emoji: c.emoji });
+    }
+    return m;
+  }, [categories]);
+
+  return React.useCallback(
+    (name: string) => {
+      return (
+        dynamicMap.get(name) ??
+        CATEGORY_META[name] ?? {
+          label: name,
+          color: "#9ca3af",
+          emoji: "•",
+        }
+      );
+    },
+    [dynamicMap],
+  );
 }

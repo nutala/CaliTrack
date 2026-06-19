@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { SessionProvider } from "@/components/providers/session-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,15 +17,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CalisTrack — Calisthenics Performance Tracker",
+  title: "CalisTrack — Suivi de performance calisthénie",
   description:
-    "Track your calisthenics workouts, progression variants (full planche, straddle, tuck...), and visualise your performance with rich dashboards.",
+    "Suis tes séances de calisthénie, tes variantes de progression (full planche, straddle, tuck...) et visualise tes performances avec des tableaux de bord détaillés.",
   keywords: [
     "calisthenics",
-    "workout tracker",
+    "calisthénie",
+    "suivi séance",
     "planche",
     "front lever",
-    "bodyweight training",
+    "poids du corps",
     "progression",
   ],
   authors: [{ name: "CalisTrack" }],
@@ -36,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="fr" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
@@ -46,10 +48,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <QueryProvider>
-            {children}
-            <SonnerToaster position="top-center" richColors closeButton />
-          </QueryProvider>
+          <SessionProvider>
+            <QueryProvider>
+              {children}
+              <SonnerToaster position="top-center" richColors closeButton />
+            </QueryProvider>
+          </SessionProvider>
         </ThemeProvider>
       </body>
     </html>

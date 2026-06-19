@@ -1,0 +1,851 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import {
+     5→  useWorkouts,
+     6→  useDeleteWorkout,
+     7→  useUpdateWorkout,
+     8→} from "@/hooks/use-data";
+     9→import { useAppStore } from "@/lib/store";
+    10→import {
+    11→  CATEGORY_META,
+    12→  type ExerciseCategory,
+    13→  type WorkoutFull,
+    14→  type WorkoutEntryFull,
+    15→} from "@/lib/types";
+    16→import {
+    17→  fmtCompact,
+    18→  fmtDate,
+    19→  metricUnit,
+    20→  relativeFromNow,
+    21→  setMetric,
+    22→  difficultyStars,
+    23→  variantLabel,
+    24→  supersetLabel,
+    25→  supersetColor,
+    26→} from "@/lib/calc";
+    27→import { EmptyState } from "@/components/app/common";
+    28→import { Card, CardContent } from "@/components/ui/card";
+    29→import { Button, buttonVariants } from "@/components/ui/button";
+    30→import { Input } from "@/components/ui/input";
+    31→import { Textarea } from "@/components/ui/textarea";
+    32→import { Label } from "@/components/ui/label";
+    33→import { Badge } from "@/components/ui/badge";
+    34→import { Slider } from "@/components/ui/slider";
+    35→import { Separator } from "@/components/ui/separator";
+    36→import {
+    37→  Dialog,
+    38→  DialogContent,
+    39→  DialogDescription,
+    40→  DialogFooter,
+    41→  DialogHeader,
+    42→  DialogTitle,
+    43→} from "@/components/ui/dialog";
+    44→import {
+    45→  AlertDialog,
+    46→  AlertDialogAction,
+    47→  AlertDialogCancel,
+    48→  AlertDialogContent,
+    49→  AlertDialogDescription,
+    50→  AlertDialogFooter,
+    51→  AlertDialogHeader,
+    52→  AlertDialogTitle,
+    53→} from "@/components/ui/alert-dialog";
+    54→import {
+    55→  DropdownMenu,
+    56→  DropdownMenuContent,
+    57→  DropdownMenuItem,
+    58→  DropdownMenuSeparator,
+    59→  DropdownMenuTrigger,
+    60→} from "@/components/ui/dropdown-menu";
+    61→import {
+    62→  Select,
+    63→  SelectContent,
+    64→  SelectItem,
+    65→  SelectTrigger,
+    66→  SelectValue,
+    67→} from "@/components/ui/select";
+    68→import { format, parseISO } from "date-fns";
+    69→import { motion, AnimatePresence } from "framer-motion";
+    70→import {
+    71→  Activity,
+    72→  ChevronDown,
+    73→  ChevronRight,
+    74→  Dumbbell,
+    75→  Gauge,
+    76→  History,
+    77→  Layers,
+    78→  Link2,
+    79→  MoreVertical,
+    80→  Pencil,
+    81→  PlusCircle,
+    82→  RefreshCw,
+    83→  Search,
+    84→  Timer,
+    85→  Trash2,
+    86→} from "lucide-react";
+    87→import { cn } from "@/lib/utils";
+    88→
+    89→/* ------------------------------------------------------------------ */
+    90→/* Helpers                                                             */
+    91→/* ------------------------------------------------------------------ */
+    92→
+    93→/** Perceived-exertion color (1-3 emerald, 4-7 amber, 8-10 red). */
+    94→function exertionColor(pe: number): string {
+    95→  if (pe <= 3) return "text-emerald-500";
+    96→  if (pe <= 7) return "text-amber-500";
+    97→  return "text-red-500";
+    98→}
+    99→
+   100→/** Total number of sets across a workout. */
+   101→function workoutSetsCount(w: WorkoutFull): number {
+   102→  return w.entries.reduce((acc, e) => acc + e.sets.length, 0);
+   103→}
+   104→
+   105→/** Total volume (sum of metric across sets) for a workout. */
+   106→function workoutVolume(w: WorkoutFull): number {
+   107→  return w.entries.reduce(
+   108→    (acc, e) => acc + e.sets.reduce((s, set) => s + setMetric(set), 0),
+   109→    0,
+   110→  );
+   111→}
+   112→
+   113→/** Case-insensitive search against workout title or any exercise name. */
+   114→function matchesSearch(w: WorkoutFull, q: string): boolean {
+   115→  if (!q) return true;
+   116→  const needle = q.toLowerCase();
+   117→  if (w.title?.toLowerCase().includes(needle)) return true;
+   118→  return w.entries.some((e) =>
+   119→    e.exercise.name.toLowerCase().includes(needle),
+   120→  );
+   121→}
+   122→
+   123→/** Safely coerce the (possibly stringified) workout date into a real Date. */
+   124→function toDate(d: string | Date): Date {
+   125→  return d instanceof Date ? d : parseISO(d);
+   126→}
+   127→
+   128→/** Group workouts into consecutive month buckets (already sorted). */
+   129→function groupByMonth(workouts: WorkoutFull[]): {
+   130→  key: string;
+   131→  label: string;
+   132→  workouts: WorkoutFull[];
+   133→}[] {
+   134→  const out: {
+   135→    key: string;
+   136→    label: string;
+   137→    workouts: WorkoutFull[];
+   138→  }[] = [];
+   139→  let currentKey: string | null = null;
+   140→  for (const w of workouts) {
+   141→    const d = toDate(w.date);
+   142→    const key = `${d.getFullYear()}-${d.getMonth()}`;
+   143→    if (key !== currentKey) {
+   144→      out.push({ key, label: format(d, "MMMM yyyy"), workouts: [w] });
+   145→      currentKey = key;
+   146→    } else {
+   147→      out[out.length - 1].workouts.push(w);
+   148→    }
+   149→  }
+   150→  return out;
+   151→}
+   152→
+   153→/* ------------------------------------------------------------------ */
+   154→/* Main view                                                           */
+   155→/* ------------------------------------------------------------------ */
+   156→
+   157→export function HistoryView() {
+   158→  const { data, isLoading, isError } = useWorkouts();
+   159→  const [search, setSearch] = React.useState("");
+   160→  const [sort, setSort] = React.useState<"newest" | "oldest">("newest");
+   161→  const [expandedId, setExpandedId] = React.useState<string | null>(null);
+   162→
+   163→  const workouts = React.useMemo(() => {
+   164→    if (!data) return [];
+   165→    const filtered = data.filter((w) => matchesSearch(w, search.trim()));
+   166→    const sorted = [...filtered].sort((a, b) => {
+   167→      const ta = toDate(a.date).getTime();
+   168→      const tb = toDate(b.date).getTime();
+   169→      return sort === "newest" ? tb - ta : ta - tb;
+   170→    });
+   171→    return sorted;
+   172→  }, [data, search, sort]);
+   173→
+   174→  const groups = React.useMemo(() => groupByMonth(workouts), [workouts]);
+   175→
+   176→  /* ---- Loading / error / empty states ---- */
+   177→  if (isLoading) {
+   178→    return (
+   179→      <div className="py-16 text-center text-sm text-muted-foreground">
+   180→        Loading history…
+   181→      </div>
+   182→    );
+   183→  }
+   184→  if (isError) {
+   185→    return (
+   186→      <div className="py-16 text-center text-sm text-destructive">
+   187→        Failed to load workouts.
+   188→      </div>
+   189→    );
+   190→  }
+   191→  if (!data || data.length === 0) {
+   192→    return (
+   193→      <div className="py-6">
+   194→        <EmptyState
+   195→          icon={History}
+   196→          title="No workouts yet"
+   197→          description="Log your first session to start tracking your progression."
+   198→          action={
+   199→            <Button
+   200→              onClick={() => useAppStore.getState().setView("new-workout")}
+   201→            >
+   202→              <PlusCircle className="h-4 w-4" />
+   203→              Log Workout
+   204→            </Button>
+   205→          }
+   206→        />
+   207→      </div>
+   208→    );
+   209→  }
+   210→
+   211→  /* ---- Render ---- */
+   212→  return (
+   213→    <div className="space-y-4">
+   214→      <Toolbar
+   215→        search={search}
+   216→        onSearch={setSearch}
+   217→        sort={sort}
+   218→        onSort={setSort}
+   219→        total={data.length}
+   220→        showing={workouts.length}
+   221→      />
+   222→
+   223→      {workouts.length === 0 ? (
+   224→        <EmptyState
+   225→          icon={Search}
+   226→          title="No matches"
+   227→          description="Try a different title or exercise name."
+   228→        />
+   229→      ) : (
+   230→        <div className="space-y-3">
+   231→          {groups.map((g) => (
+   232→            <section key={g.key} className="space-y-2">
+   233→              <div className="sticky top-16 z-10 -mx-1 bg-background/95 px-1 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+   234→                <div className="flex items-baseline justify-between">
+   235→                  <h3 className="text-sm font-semibold tracking-tight text-foreground">
+   236→                    {g.label}
+   237→                  </h3>
+   238→                  <span className="text-xs tabular-nums text-muted-foreground">
+   239→                    {g.workouts.length} session
+   240→                    {g.workouts.length > 1 ? "s" : ""}
+   241→                  </span>
+   242→                </div>
+   243→                <Separator className="mt-1.5" />
+   244→              </div>
+   245→
+   246→              {g.workouts.map((w) => (
+   247→                <WorkoutCard
+   248→                  key={w.id}
+   249→                  workout={w}
+   250→                  expanded={expandedId === w.id}
+   251→                  onToggle={() =>
+   252→                    setExpandedId((prev) => (prev === w.id ? null : w.id))
+   253→                  }
+   254→                />
+   255→              ))}
+   256→            </section>
+   257→          ))}
+   258→        </div>
+   259→      )}
+   260→    </div>
+   261→  );
+   262→}
+   263→
+   264→/* ------------------------------------------------------------------ */
+   265→/* Toolbar                                                             */
+   266→/* ------------------------------------------------------------------ */
+   267→
+   268→function Toolbar({
+   269→  search,
+   270→  onSearch,
+   271→  sort,
+   272→  onSort,
+   273→  total,
+   274→  showing,
+   275→}: {
+   276→  search: string;
+   277→  onSearch: (v: string) => void;
+   278→  sort: "newest" | "oldest";
+   279→  onSort: (v: "newest" | "oldest") => void;
+   280→  total: number;
+   281→  showing: number;
+   282→}) {
+   283→  return (
+   284→    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+   285→      <div className="relative w-full sm:max-w-xs">
+   286→        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+   287→        <Input
+   288→          value={search}
+   289→          onChange={(e) => onSearch(e.target.value)}
+   290→          placeholder="Search title or exercise…"
+   291→          className="pl-9"
+   292→          aria-label="Search workouts"
+   293→        />
+   294→      </div>
+   295→      <div className="flex items-center justify-between gap-3 sm:justify-end">
+   296→        <span className="text-xs tabular-nums text-muted-foreground">
+   297→          {showing}/{total} workouts
+   298→        </span>
+   299→        <Select
+   300→          value={sort}
+   301→          onValueChange={(v) => onSort(v as "newest" | "oldest")}
+   302→        >
+   303→          <SelectTrigger size="sm" className="w-[150px]" aria-label="Sort order">
+   304→            <SelectValue />
+   305→          </SelectTrigger>
+   306→          <SelectContent>
+   307→            <SelectItem value="newest">Newest first</SelectItem>
+   308→            <SelectItem value="oldest">Oldest first</SelectItem>
+   309→          </SelectContent>
+   310→        </Select>
+   311→      </div>
+   312→    </div>
+   313→  );
+   314→}
+   315→
+   316→/* ------------------------------------------------------------------ */
+   317→/* Workout card                                                        */
+   318→/* ------------------------------------------------------------------ */
+   319→
+   320→function WorkoutCard({
+   321→  workout,
+   322→  expanded,
+   323→  onToggle,
+   324→}: {
+   325→  workout: WorkoutFull;
+   326→  expanded: boolean;
+   327→  onToggle: () => void;
+   328→}) {
+   329→  const date = toDate(workout.date);
+   330→  const totalSets = workoutSetsCount(workout);
+   331→  const totalVolume = workoutVolume(workout);
+   332→  const entryCount = workout.entries.length;
+   333→  const pe = workout.perceivedExertion ?? 0;
+   334→  const hasNotes = !!workout.notes?.trim();
+   335→
+   336→  return (
+   337→    <Card className="gap-0 overflow-hidden py-0">
+   338→      <div className="flex items-stretch">
+   339→        {/* Clickable summary */}
+   340→        <button
+   341→          type="button"
+   342→          onClick={onToggle}
+   343→          aria-expanded={expanded}
+   344→          className="flex min-w-0 flex-1 items-center gap-3 p-4 text-left transition-colors hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none"
+   345→        >
+   346→          {/* Date block */}
+   347→          <div className="flex w-12 shrink-0 flex-col items-center rounded-lg bg-muted/50 py-1.5 text-center">
+   348→            <span className="text-xl font-bold leading-none tabular-nums text-foreground">
+   349→              {format(date, "dd")}
+   350→            </span>
+   351→            <span className="mt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+   352→              {format(date, "EEE")}
+   353→            </span>
+   354→          </div>
+   355→
+   356→          {/* Title + chips */}
+   357→          <div className="min-w-0 flex-1">
+   358→            <div className="flex items-center gap-2">
+   359→              <span className="truncate text-sm font-semibold text-foreground">
+   360→                {workout.title?.trim() || "Untitled session"}
+   361→              </span>
+   362→              <span className="hidden shrink-0 text-[11px] tabular-nums text-muted-foreground sm:inline">
+   363→                · {relativeFromNow(workout.date)}
+   364→              </span>
+   365→            </div>
+   366→            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+   367→              {workout.durationMin != null && (
+   368→                <Chip icon={Timer} label={`${workout.durationMin}m`} />
+   369→              )}
+   370→              {pe > 0 && (
+   371→                <Chip
+   372→                  icon={Gauge}
+   373→                  label={`RPE ${pe}`}
+   374→                  className={exertionColor(pe)}
+   375→                />
+   376→              )}
+   377→              <Chip icon={Dumbbell} label={`${entryCount}`} />
+   378→              <Chip icon={Layers} label={`${totalSets}`} />
+   379→              <Chip icon={Activity} label={fmtCompact(totalVolume)} />
+   380→              {hasNotes && (
+   381→                <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+   382→                  notes
+   383→                </span>
+   384→              )}
+   385→            </div>
+   386→          </div>
+   387→        </button>
+   388→
+   389→        {/* Right-side actions (do not toggle on click) */}
+   390→        <div className="flex shrink-0 items-center gap-0.5 p-3 pr-4">
+   391→          <Button
+   392→            type="button"
+   393→            variant="ghost"
+   394→            size="icon"
+   395→            className="h-8 w-8 text-muted-foreground"
+   396→            onClick={onToggle}
+   397→            aria-label={expanded ? "Collapse details" : "Expand details"}
+   398→          >
+   399→            {expanded ? (
+   400→              <ChevronDown className="h-4 w-4" />
+   401→            ) : (
+   402→              <ChevronRight className="h-4 w-4" />
+   403→            )}
+   404→          </Button>
+   405→          <OverflowMenu workout={workout} />
+   406→        </div>
+   407→      </div>
+   408→
+   409→      <AnimatePresence initial={false}>
+   410→        {expanded && (
+   411→          <motion.div
+   412→            key="expanded"
+   413→            initial={{ height: 0, opacity: 0 }}
+   414→            animate={{ height: "auto", opacity: 1 }}
+   415→            exit={{ height: 0, opacity: 0 }}
+   416→            transition={{ duration: 0.22, ease: "easeInOut" }}
+   417→            className="overflow-hidden"
+   418→          >
+   419→            <CardContent className="space-y-3 border-t pt-4">
+   420→              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] tabular-nums text-muted-foreground">
+   421→                <span>{fmtDate(workout.date, "EEEE d MMMM yyyy")}</span>
+   422→                {workout.bodyweightKg != null && (
+   423→                  <>
+   424→                    <span>·</span>
+   425→                    <span>BW {workout.bodyweightKg} kg</span>
+   426→                  </>
+   427→                )}
+   428→              </div>
+   429→
+   430→              {hasNotes && (
+   431→                <div className="rounded-md bg-muted/40 p-3 text-sm italic text-muted-foreground">
+   432→                  “{workout.notes!.trim()}”
+   433→                </div>
+   434→              )}
+   435→
+   436→              {workout.entries.length === 0 ? (
+   437→                <p className="text-sm text-muted-foreground">No entries.</p>
+   438→              ) : (
+   439→                <div className="space-y-2">
+   440→                  {workout.entries.map((entry) => (
+   441→                    <EntryDetail key={entry.id} entry={entry} />
+   442→                  ))}
+   443→                </div>
+   444→              )}
+   445→            </CardContent>
+   446→          </motion.div>
+   447→        )}
+   448→      </AnimatePresence>
+   449→    </Card>
+   450→  );
+   451→}
+   452→
+   453→/* ------------------------------------------------------------------ */
+   454→/* Small chip                                                          */
+   455→/* ------------------------------------------------------------------ */
+   456→
+   457→function Chip({
+   458→  icon: Icon,
+   459→  label,
+   460→  className,
+   461→}: {
+   462→  icon: React.ComponentType<{ className?: string }>;
+   463→  label: string;
+   464→  className?: string;
+   465→}) {
+   466→  return (
+   467→    <span
+   468→      className={cn(
+   469→        "inline-flex items-center gap-1 text-xs tabular-nums text-muted-foreground",
+   470→        className,
+   471→      )}
+   472→    >
+   473→      <Icon className="h-3.5 w-3.5" />
+   474→      {label}
+   475→    </span>
+   476→  );
+   477→}
+   478→
+   479→/* ------------------------------------------------------------------ */
+   480→/* Overflow menu (Edit / Delete)                                       */
+   481→/* ------------------------------------------------------------------ */
+   482→
+   483→function OverflowMenu({ workout }: { workout: WorkoutFull }) {
+   484→  const [editOpen, setEditOpen] = React.useState(false);
+   485→  const [deleteOpen, setDeleteOpen] = React.useState(false);
+   486→  const repeatWorkout = useAppStore((s) => s.repeatWorkout);
+   487→
+   488→  return (
+   489→    <>
+   490→      <DropdownMenu>
+   491→        <DropdownMenuTrigger asChild>
+   492→          <Button
+   493→            type="button"
+   494→            variant="ghost"
+   495→            size="icon"
+   496→            className="h-8 w-8 text-muted-foreground"
+   497→            aria-label="Workout actions"
+   498→          >
+   499→            <MoreVertical className="h-4 w-4" />
+   500→          </Button>
+   501→        </DropdownMenuTrigger>
+   502→        <DropdownMenuContent align="end">
+   503→          <DropdownMenuItem onSelect={() => repeatWorkout(workout)}>
+   504→            <RefreshCw className="h-4 w-4" />
+   505→            Repeat workout
+   506→          </DropdownMenuItem>
+   507→          <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+   508→            <Pencil className="h-4 w-4" />
+   509→            Edit
+   510→          </DropdownMenuItem>
+   511→          <DropdownMenuSeparator />
+   512→          <DropdownMenuItem
+   513→            variant="destructive"
+   514→            onSelect={() => setDeleteOpen(true)}
+   515→          >
+   516→            <Trash2 className="h-4 w-4" />
+   517→            Delete
+   518→          </DropdownMenuItem>
+   519→        </DropdownMenuContent>
+   520→      </DropdownMenu>
+   521→
+   522→      <EditDialog
+   523→        workout={workout}
+   524→        open={editOpen}
+   525→        onOpenChange={setEditOpen}
+   526→      />
+   527→      <DeleteDialog
+   528→        workoutId={workout.id}
+   529→        open={deleteOpen}
+   530→        onOpenChange={setDeleteOpen}
+   531→      />
+   532→    </>
+   533→  );
+   534→}
+   535→
+   536→/* ------------------------------------------------------------------ */
+   537→/* Expanded entry detail                                               */
+   538→/* ------------------------------------------------------------------ */
+   539→
+   540→function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
+   541→  const cat = (entry.exercise.category as ExerciseCategory) || "Push";
+   542→  const meta = CATEGORY_META[cat] ?? CATEGORY_META.Push;
+   543→  const isStatic = entry.exercise.isStatic;
+   544→  const unit = metricUnit(isStatic);
+   545→  const totalSets = entry.sets.length;
+   546→  const totalVol = entry.sets.reduce((a, s) => a + setMetric(s), 0);
+   547→  const best = entry.sets.reduce((m, s) => Math.max(m, setMetric(s)), 0);
+   548→  const diff = entry.variant?.difficultyLevel ?? 1;
+   549→
+   550→  const ssLabel = supersetLabel(entry.supersetGroup);
+   551→  const ssColor = supersetColor(entry.supersetGroup);
+   552→  const inSuperset = entry.supersetGroup != null;
+   553→
+   554→  return (
+   555→    <div
+   556→      className="rounded-md border border-border/60 p-3"
+   557→      style={
+   558→        inSuperset && ssColor
+   559→          ? { borderLeftColor: ssColor, borderLeftWidth: 3 }
+   560→          : undefined
+   561→      }
+   562→    >
+   563→      <div className="flex flex-wrap items-center gap-2">
+   564→        <span className="text-sm font-semibold text-foreground">
+   565→          {entry.exercise.name}
+   566→        </span>
+   567→        <Badge
+   568→          variant="outline"
+   569→          className="border-transparent text-[10px] font-semibold"
+   570→          style={{ backgroundColor: `${meta.color}22`, color: meta.color }}
+   571→        >
+   572→          {meta.label}
+   573→        </Badge>
+   574→        <span className="text-xs text-muted-foreground">
+   575→          {variantLabel(entry.variant)}
+   576→          <span className="ml-1 tabular-nums">{difficultyStars(diff)}</span>
+   577→        </span>
+   578→        {inSuperset && ssColor && ssLabel && (
+   579→          <Badge
+   580→            variant="outline"
+   581→            className="ml-auto gap-1 border-transparent text-[10px] font-bold"
+   582→            style={{ backgroundColor: `${ssColor}22`, color: ssColor }}
+   583→            title="Part of a superset"
+   584→          >
+   585→            <Link2 className="h-3 w-3" />
+   586→            Superset {ssLabel}
+   587→          </Badge>
+   588→        )}
+   589→      </div>
+   590→
+   591→      {entry.notes?.trim() && (
+   592→        <p className="mt-1.5 text-xs italic text-muted-foreground">
+   593→          {entry.notes.trim()}
+   594→        </p>
+   595→      )}
+   596→
+   597→      {totalSets > 0 && (
+   598→        <div className="mt-3 overflow-x-auto">
+   599→          <table className="w-full text-xs tabular-nums">
+   600→            <thead>
+   601→              <tr className="text-left text-muted-foreground">
+   602→                <th className="py-1 pr-3 font-medium">Set</th>
+   603→                <th className="py-1 pr-3 font-medium">
+   604→                  {isStatic ? "Hold" : "Reps"}
+   605→                </th>
+   606→                <th className="py-1 pr-3 font-medium">kg</th>
+   607→                <th className="py-1 font-medium">RPE</th>
+   608→              </tr>
+   609→            </thead>
+   610→            <tbody>
+   611→              {entry.sets.map((s) => (
+   612→                <tr key={s.id} className="border-t border-border/40">
+   613→                  <td className="py-1.5 pr-3 text-muted-foreground">
+   614→                    {s.setNumber}
+   615→                  </td>
+   616→                  <td className="py-1.5 pr-3 font-medium text-foreground">
+   617→                    {setMetric(s)}{" "}
+   618→                    <span className="text-muted-foreground">{unit}</span>
+   619→                  </td>
+   620→                  <td className="py-1.5 pr-3 text-muted-foreground">
+   621→                    {s.weightKg != null ? `${s.weightKg}` : "—"}
+   622→                  </td>
+   623→                  <td className="py-1.5 text-muted-foreground">
+   624→                    {s.rpe ?? "—"}
+   625→                  </td>
+   626→                </tr>
+   627→              ))}
+   628→            </tbody>
+   629→          </table>
+   630→        </div>
+   631→      )}
+   632→
+   633→      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] tabular-nums text-muted-foreground">
+   634→        <span>{totalSets} sets</span>
+   635→        <span aria-hidden>·</span>
+   636→        <span>{fmtCompact(totalVol)} vol</span>
+   637→        <span aria-hidden>·</span>
+   638→        <span>
+   639→          best {best} {unit}
+   640→        </span>
+   641→      </div>
+   642→    </div>
+   643→  );
+   644→}
+   645→
+   646→/* ------------------------------------------------------------------ */
+   647→/* Edit dialog                                                         */
+   648→/* ------------------------------------------------------------------ */
+   649→
+   650→function EditDialog({
+   651→  workout,
+   652→  open,
+   653→  onOpenChange,
+   654→}: {
+   655→  workout: WorkoutFull;
+   656→  open: boolean;
+   657→  onOpenChange: (v: boolean) => void;
+   658→}) {
+   659→  const update = useUpdateWorkout();
+   660→  const [title, setTitle] = React.useState("");
+   661→  const [dateStr, setDateStr] = React.useState("");
+   662→  const [durationMin, setDurationMin] = React.useState("");
+   663→  const [pe, setPe] = React.useState(5);
+   664→  const [bodyweightKg, setBodyweightKg] = React.useState("");
+   665→  const [notes, setNotes] = React.useState("");
+   666→
+   667→  // Reset form whenever the dialog opens.
+   668→  React.useEffect(() => {
+   669→    if (!open) return;
+   670→    setTitle(workout.title ?? "");
+   671→    setDateStr(format(toDate(workout.date), "yyyy-MM-dd"));
+   672→    setDurationMin(
+   673→      workout.durationMin != null ? String(workout.durationMin) : "",
+   674→    );
+   675→    setPe(workout.perceivedExertion ?? 5);
+   676→    setBodyweightKg(
+   677→      workout.bodyweightKg != null ? String(workout.bodyweightKg) : "",
+   678→    );
+   679→    setNotes(workout.notes ?? "");
+   680→  }, [open, workout]);
+   681→
+   682→  const handleSubmit = (e: React.FormEvent) => {
+   683→    e.preventDefault();
+   684→    const body: Record<string, unknown> = {
+   685→      title: title.trim() || null,
+   686→      date: dateStr ? new Date(`${dateStr}T00:00:00`).toISOString() : undefined,
+   687→      durationMin: durationMin === "" ? null : Number(durationMin),
+   688→      perceivedExertion: pe,
+   689→      bodyweightKg: bodyweightKg === "" ? null : Number(bodyweightKg),
+   690→      notes: notes.trim() || null,
+   691→    };
+   692→    update.mutate(
+   693→      { id: workout.id, body },
+   694→      { onSuccess: () => onOpenChange(false) },
+   695→    );
+   696→  };
+   697→
+   698→  return (
+   699→    <Dialog open={open} onOpenChange={onOpenChange}>
+   700→      <DialogContent className="sm:max-w-md">
+   701→        <DialogHeader>
+   702→          <DialogTitle>Edit workout</DialogTitle>
+   703→          <DialogDescription>
+   704→            Update session metadata. Sets and entries are not editable here.
+   705→          </DialogDescription>
+   706→        </DialogHeader>
+   707→
+   708→        <form onSubmit={handleSubmit} className="space-y-4">
+   709→          <div className="space-y-2">
+   710→            <Label htmlFor="hw-title">Title</Label>
+   711→            <Input
+   712→              id="hw-title"
+   713→              value={title}
+   714→              onChange={(e) => setTitle(e.target.value)}
+   715→              placeholder="Untitled session"
+   716→            />
+   717→          </div>
+   718→
+   719→          <div className="grid grid-cols-2 gap-3">
+   720→            <div className="space-y-2">
+   721→              <Label htmlFor="hw-date">Date</Label>
+   722→              <Input
+   723→                id="hw-date"
+   724→                type="date"
+   725→                value={dateStr}
+   726→                onChange={(e) => setDateStr(e.target.value)}
+   727→              />
+   728→            </div>
+   729→            <div className="space-y-2">
+   730→              <Label htmlFor="hw-duration">Duration (min)</Label>
+   731→              <Input
+   732→                id="hw-duration"
+   733→                type="number"
+   734→                min={0}
+   735→                value={durationMin}
+   736→                onChange={(e) => setDurationMin(e.target.value)}
+   737→                placeholder="—"
+   738→                inputMode="numeric"
+   739→              />
+   740→            </div>
+   741→          </div>
+   742→
+   743→          <div className="space-y-2">
+   744→            <div className="flex items-center justify-between">
+   745→              <Label>Perceived exertion (RPE)</Label>
+   746→              <span
+   747→                className={cn(
+   748→                  "text-sm font-semibold tabular-nums",
+   749→                  exertionColor(pe),
+   750→                )}
+   751→              >
+   752→                {pe}
+   753→              </span>
+   754→            </div>
+   755→            <Slider
+   756→              min={1}
+   757→              max={10}
+   758→              step={1}
+   759→              value={[pe]}
+   760→              onValueChange={(v) => setPe(v[0] ?? 5)}
+   761→              aria-label="Perceived exertion"
+   762→            />
+   763→          </div>
+   764→
+   765→          <div className="space-y-2">
+   766→            <Label htmlFor="hw-bw">Bodyweight (kg)</Label>
+   767→            <Input
+   768→              id="hw-bw"
+   769→              type="number"
+   770→              step="0.1"
+   771→              min={0}
+   772→              value={bodyweightKg}
+   773→              onChange={(e) => setBodyweightKg(e.target.value)}
+   774→              placeholder="—"
+   775→              inputMode="decimal"
+   776→            />
+   777→          </div>
+   778→
+   779→          <div className="space-y-2">
+   780→            <Label htmlFor="hw-notes">Notes</Label>
+   781→            <Textarea
+   782→              id="hw-notes"
+   783→              value={notes}
+   784→              onChange={(e) => setNotes(e.target.value)}
+   785→              placeholder="How did it feel?"
+   786→              rows={3}
+   787→            />
+   788→          </div>
+   789→
+   790→          <DialogFooter>
+   791→            <Button
+   792→              type="button"
+   793→              variant="outline"
+   794→              onClick={() => onOpenChange(false)}
+   795→              disabled={update.isPending}
+   796→            >
+   797→              Cancel
+   798→            </Button>
+   799→            <Button type="submit" disabled={update.isPending}>
+   800→              {update.isPending ? "Saving…" : "Save changes"}
+   801→            </Button>
+   802→          </DialogFooter>
+   803→        </form>
+   804→      </DialogContent>
+   805→    </Dialog>
+   806→  );
+   807→}
+   808→
+   809→/* ------------------------------------------------------------------ */
+   810→/* Delete dialog                                                       */
+   811→/* ------------------------------------------------------------------ */
+   812→
+   813→function DeleteDialog({
+   814→  workoutId,
+   815→  open,
+   816→  onOpenChange,
+   817→}: {
+   818→  workoutId: string;
+   819→  open: boolean;
+   820→  onOpenChange: (v: boolean) => void;
+   821→}) {
+   822→  const del = useDeleteWorkout();
+   823→
+   824→  return (
+   825→    <AlertDialog open={open} onOpenChange={onOpenChange}>
+   826→      <AlertDialogContent>
+   827→        <AlertDialogHeader>
+   828→          <AlertDialogTitle>Delete this workout?</AlertDialogTitle>
+   829→          <AlertDialogDescription>
+   830→            This cannot be undone.
+   831→          </AlertDialogDescription>
+   832→        </AlertDialogHeader>
+   833→        <AlertDialogFooter>
+   834→          <AlertDialogCancel disabled={del.isPending}>Cancel</AlertDialogCancel>
+   835→          <AlertDialogAction
+   836→            className={cn(buttonVariants({ variant: "destructive" }))}
+   837→            disabled={del.isPending}
+   838→            onClick={() =>
+   839→              del.mutate(workoutId, {
+   840→                onSuccess: () => onOpenChange(false),
+   841→              })
+   842→            }
+   843→          >
+   844→            {del.isPending ? "Deleting…" : "Delete"}
+   845→          </AlertDialogAction>
+   846→        </AlertDialogFooter>
+   847→      </AlertDialogContent>
+   848→    </AlertDialog>
+   849→  );
+   850→}
+   851→

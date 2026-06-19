@@ -10,26 +10,57 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// A user account (created via Google OAuth or the demo Google sign-in).
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  exercises  Exercise[]
+  workouts   Workout[]
+  categories Category[]
+}
+
+/// A custom exercise category (Push, Pull, Legs, or user-created ones).
+/// Seeded with defaults for each new user.
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  label     String
+  color     String   @default("#9ca3af")
+  emoji     String   @default("•")
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
 /// A tracked calisthenics exercise (e.g. Planche, Pull-up, Pistol Squat)
 model Exercise {
   id          String   @id @default(cuid())
   name        String   @unique
-  /// Push, Pull, Legs, Core, Static, Mobility, Skill
   category    String   @default("Push")
-  /// Primary muscle group targeted
   muscleGroup String   @default("Full body")
-  /// true = isometric hold (tracked in seconds), false = dynamic reps
   isStatic    Boolean  @default(false)
   description String?
-  /// Equipment or setup hints (paralettes, wall, rings...)
   equipment   String?
+  userId      String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  variants     ExerciseVariant[]
+  user          User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variants      ExerciseVariant[]
   workoutEntries WorkoutEntry[]
 
   @@index([category])
+  @@index([userId])
 }
 
 /// A progression variant of an exercise (Tuck, Advanced Tuck, Straddle, Full...)
@@ -37,10 +68,8 @@ model ExerciseVariant {
   id              String   @id @default(cuid())
   exerciseId      String
   name            String
-  /// Difficulty rank within the exercise's progression (1 = easiest)
   difficultyLevel Int      @default(1)
   description     String?
-  /// Optional target hold (seconds) or reps to "graduate" this variant
   targetValue     Int?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -55,20 +84,21 @@ model ExerciseVariant {
 /// A logged training session
 model Workout {
   id        String   @id @default(cuid())
-  /// Date the workout was performed (date only, stored as DateTime midnight)
   date      DateTime @default(now())
   title     String?
   durationMin Int?
-  /// User-perceived exertion 1-10
   perceivedExertion Int?
   bodyweightKg Float?
   notes     String?
+  userId    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  user    User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   entries WorkoutEntry[]
 
   @@index([date])
+  @@index([userId])
 }
 
 /// An exercise (with optional variant) performed inside a workout
@@ -77,9 +107,8 @@ model WorkoutEntry {
   workoutId  String
   exerciseId String
   variantId  String?
-  /// Superset group number (entries sharing the same non-null value in a workout
-  /// are performed back-to-back as a superset). Null = standalone exercise.
   supersetGroup Int?
+  position   Int      @default(0)
   notes      String?
   createdAt  DateTime @default(now())
 
@@ -97,13 +126,9 @@ model WorkoutSet {
   id              String   @id @default(cuid())
   workoutEntryId  String
   setNumber       Int
-  /// Repetitions (for dynamic exercises)
   reps            Int?
-  /// Hold duration in seconds (for isometric exercises)
   holdSeconds     Int?
-  /// Extra weight in kg (weighted calisthenics)
   weightKg        Float?
-  /// Rate of perceived exertion 1-10
   rpe             Int?
   createdAt       DateTime @default(now())
 

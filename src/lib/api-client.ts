@@ -68,6 +68,7 @@ export const qk = {
   exercise: (id: string) => ["exercises", id] as const,
   workouts: ["workouts"] as const,
   workout: (id: string) => ["workouts", id] as const,
+  categories: ["categories"] as const,
   overview: ["stats", "overview"] as const,
   topExercises: ["stats", "top-exercises"] as const,
   progress: (exerciseId: string, variantId?: string | null) =>

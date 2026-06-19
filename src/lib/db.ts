@@ -9,7 +9,7 @@ const globalForPrisma = globalThis as unknown as {
 
 /// Bump this when the Prisma schema changes to force a new client instance
 /// (the global singleton would otherwise keep the old field definitions).
-const SCHEMA_VERSION = 'v3-superset-fix'
+const SCHEMA_VERSION = 'v5-rebuild-user-cat'
 
 // Always create a fresh client in dev when the version bumps, and disconnect
 // any previous instance to release its connection.

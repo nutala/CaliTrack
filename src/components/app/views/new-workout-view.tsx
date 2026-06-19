@@ -16,6 +16,8 @@ import {
   Link2,
   Link2Off,
   RefreshCw,
+  Clock,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,13 +25,13 @@ import { cn } from "@/lib/utils";
 import {
   type ExerciseWithVariants,
   type ExerciseCategory,
-  CATEGORY_META,
 } from "@/lib/types";
 import { metricUnit, fmtCompact, supersetLabel, supersetColor } from "@/lib/calc";
 import {
   useExercises,
   useCreateWorkout,
   useWorkouts,
+  useCategoryMeta,
   type NewWorkoutPayload,
 } from "@/hooks/use-data";
 import { useAppStore } from "@/lib/store";
@@ -71,6 +73,16 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -115,6 +127,7 @@ export function NewWorkoutView() {
   const createWorkout = useCreateWorkout();
 
   const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [cancelOpen, setCancelOpen] = React.useState(false);
 
   // Resolve exercise objects by id for the draft entries.
   const exerciseMap = React.useMemo(() => {
@@ -122,6 +135,11 @@ export function NewWorkoutView() {
     for (const ex of exercises) m.set(ex.id, ex);
     return m;
   }, [exercises]);
+
+  // ----- Start the session timer automatically on first mount -----
+  React.useEffect(() => {
+    draft.startSession();
+  }, []);
 
   // ----- Consume "Repeat workout" prefill on mount -----
   const repeatId = useAppStore((s) => s.repeatWorkoutId);
@@ -131,14 +149,14 @@ export function NewWorkoutView() {
     if (!id) return;
     const workout = workoutsQ.data?.find((w) => w.id === id);
     if (!workout) {
-      toast.info("Workout data still loading — try again in a moment.");
+      toast.info("Données de la séance encore en cours de chargement — réessaie dans un instant.");
       return;
     }
     draft.loadFromWorkout(workout, exerciseMap);
-    toast.success(`Loaded "${workout.title || "session"}" — adjust and save.`);
+    toast.success(`Séance « ${workout.title || "session"} » chargée — ajuste puis enregistre.`);
   }, [repeatId, workoutsQ.data]);
 
-  const { title, date, durationMin, exertion, bodyweight, notes, defaultRestSec, entries } = draft;
+  const { title, date, durationMin, exertion, bodyweight, notes, defaultRestSec, entries, sessionStartedAt } = draft;
 
   function addEntry(exercise: ExerciseWithVariants) {
     draft.addEntry(exercise);
@@ -159,26 +177,26 @@ export function NewWorkoutView() {
   // ----- save handler -----
   function handleSave() {
     if (entries.length === 0) {
-      toast.error("Add at least one exercise before saving.");
+      toast.error("Ajoute au moins un exercice avant d'enregistrer.");
       return;
     }
 
     for (const entry of entries) {
       const ex = exerciseMap.get(entry.exerciseId);
       if (!ex) {
-        toast.error("One of your exercises could not be found. Remove it and re-add.");
+        toast.error("Un de tes exercices est introuvable. Retire-le puis ré-ajoute-le.");
         return;
       }
       if (entry.sets.length === 0) {
-        toast.error(`"${ex.name}" has no sets. Add one or remove the entry.`);
+        toast.error(`« ${ex.name} » n'a aucune série. Ajoute-en une ou retire l'entrée.`);
         return;
       }
       for (const set of entry.sets) {
         const metric = ex.isStatic ? set.holdSeconds : set.reps;
         if (metric == null || Number.isNaN(metric)) {
-          const label = ex.isStatic ? "hold (s)" : "reps";
+          const label = ex.isStatic ? "maintien (s)" : "reps";
           toast.error(
-            `Every set on "${ex.name}" needs a ${label} value.`,
+            `Chaque série de « ${ex.name} » doit avoir une valeur de ${label}.`,
           );
           return;
         }
@@ -223,11 +241,17 @@ export function NewWorkoutView() {
     });
   }
 
+  function handleCancel() {
+    draft.cancelSession();
+    setCancelOpen(false);
+    useAppStore.getState().setView("dashboard");
+  }
+
   return (
     <div className="space-y-6 pb-28">
       <SectionHeading
-        title="Log a workout"
-        subtitle="Pick exercises, log sets, run rest timers, and save your session."
+        title="Nouvelle séance"
+        subtitle="Choisis tes exercices, enregistre tes séries, lance les minuteurs de repos et sauvegarde ta session."
       />
 
       {/* ----------------------- Header card ----------------------- */}
@@ -235,16 +259,16 @@ export function NewWorkoutView() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Gauge className="h-4 w-4 text-muted-foreground" />
-            Session details
+            Détails de la séance
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="nw-title">Title</Label>
+              <Label htmlFor="nw-title">Titre</Label>
               <Input
                 id="nw-title"
-                placeholder="Push & planche focus"
+                placeholder="Focus push & planche"
                 value={title}
                 onChange={(e) => draft.setMeta("title", e.target.value)}
               />
@@ -262,7 +286,7 @@ export function NewWorkoutView() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="nw-duration">Duration (min)</Label>
+              <Label htmlFor="nw-duration">Durée (min)</Label>
               <Input
                 id="nw-duration"
                 type="number"
@@ -281,7 +305,7 @@ export function NewWorkoutView() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="nw-bw">Bodyweight (kg)</Label>
+              <Label htmlFor="nw-bw">Poids du corps (kg)</Label>
               <Input
                 id="nw-bw"
                 type="number"
@@ -300,7 +324,7 @@ export function NewWorkoutView() {
 
             <div className="space-y-2 sm:col-span-2">
               <div className="flex items-center justify-between">
-                <Label>Perceived exertion</Label>
+                <Label>Effort perçu</Label>
                 <Badge
                   variant="outline"
                   className={cn("tabular-nums", exertionBadgeClass(exertion))}
@@ -317,8 +341,8 @@ export function NewWorkoutView() {
                 className={cn("mt-2", sliderAccentClass(exertion))}
               />
               <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
-                <span>1 Easy</span>
-                <span>5 Moderate</span>
+                <span>1 Facile</span>
+                <span>5 Modéré</span>
                 <span>10 Max</span>
               </div>
             </div>
@@ -327,7 +351,7 @@ export function NewWorkoutView() {
               <Label htmlFor="nw-notes">Notes</Label>
               <Textarea
                 id="nw-notes"
-                placeholder="How did the session feel?"
+                placeholder="Comment s'est passée la séance ?"
                 value={notes}
                 onChange={(e) => draft.setMeta("notes", e.target.value)}
                 rows={2}
@@ -338,7 +362,7 @@ export function NewWorkoutView() {
             <div className="space-y-1.5 sm:col-span-2">
               <Label className="flex items-center gap-1.5">
                 <Coffee className="h-3.5 w-3.5" />
-                Default rest between sets
+                Repos par défaut entre les séries
               </Label>
               <div className="flex flex-wrap gap-2">
                 {REST_PRESETS.map((p) => (
@@ -362,19 +386,19 @@ export function NewWorkoutView() {
       {/* ----------------------- Exercise picker trigger ----------------------- */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-semibold">Exercises</h3>
+          <h3 className="text-base font-semibold">Exercices</h3>
           <p className="text-sm text-muted-foreground">
-            {entries.length} {entries.length === 1 ? "entry" : "entries"}
+            {entries.length} {entries.length === 1 ? "entrée" : "entrées"}
             {validatedSets > 0 && (
               <span className="ml-2 text-emerald-500">
-                · {validatedSets}/{totalSets} sets done
+                · {validatedSets}/{totalSets} séries validées
               </span>
             )}
           </p>
         </div>
         <Button onClick={() => setPickerOpen(true)}>
           <PlusCircle className="h-4 w-4" />
-          Add Exercise
+          Ajouter un exercice
         </Button>
       </div>
 
@@ -382,12 +406,12 @@ export function NewWorkoutView() {
       {entries.length === 0 ? (
         <EmptyState
           icon={PlusCircle}
-          title="No exercises yet"
-          description="Add your first exercise to start logging sets. Tip: you can group exercises into supersets and run rest timers between sets."
+          title="Aucun exercice pour le moment"
+          description="Ajoute ton premier exercice pour commencer à enregistrer tes séries. Astuce : tu peux regrouper des exercices en supersets et lancer des minuteurs de repos entre les séries."
           action={
             <Button onClick={() => setPickerOpen(true)}>
               <PlusCircle className="h-4 w-4" />
-              Add Exercise
+              Ajouter un exercice
             </Button>
           }
         />
@@ -450,15 +474,18 @@ export function NewWorkoutView() {
       <div className="sticky bottom-4 z-30">
         <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-background/80 p-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:flex-row sm:items-center sm:justify-between sm:p-4">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
+            {sessionStartedAt != null && (
+              <SessionTimer startedAt={sessionStartedAt} />
+            )}
             <div className="flex items-center gap-1.5">
               <Dumbbell className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium tabular-nums">{entries.length}</span>
-              <span className="text-muted-foreground">entries</span>
+              <span className="text-muted-foreground">entrées</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Timer className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium tabular-nums">{totalSets}</span>
-              <span className="text-muted-foreground">sets</span>
+              <span className="text-muted-foreground">séries</span>
             </div>
             {validatedSets > 0 && (
               <div className="flex items-center gap-1.5">
@@ -466,7 +493,7 @@ export function NewWorkoutView() {
                 <span className="font-medium tabular-nums text-emerald-500">
                   {validatedSets}
                 </span>
-                <span className="text-muted-foreground">done</span>
+                <span className="text-muted-foreground">validées</span>
               </div>
             )}
             <div className="flex items-center gap-1.5">
@@ -474,28 +501,60 @@ export function NewWorkoutView() {
               <span className="font-medium tabular-nums">
                 {fmtCompact(totalVolume)}
               </span>
-              <span className="text-muted-foreground">total volume</span>
+              <span className="text-muted-foreground">volume total</span>
             </div>
           </div>
-          <Button
-            onClick={handleSave}
-            disabled={createWorkout.isPending}
-            className="sm:min-w-44"
-          >
-            {createWorkout.isPending ? (
-              <>
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                Saving…
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Save Workout
-              </>
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCancelOpen(true)}
+              disabled={createWorkout.isPending}
+              className="text-destructive hover:text-destructive"
+            >
+              <X className="h-4 w-4" />
+              Annuler
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={createWorkout.isPending}
+              className="sm:min-w-44"
+            >
+              {createWorkout.isPending ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Enregistrement…
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Enregistrer la séance
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* ----------------------- Cancel confirmation ----------------------- */}
+      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annuler la séance ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Toutes les séries en cours seront perdues. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuer la séance</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancel}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Annuler la séance
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ----------------------- Exercise picker dialog ----------------------- */}
       <ExercisePickerDialog
@@ -504,6 +563,33 @@ export function NewWorkoutView() {
         exercises={exercises}
         onPick={addEntry}
       />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SessionTimer — live stopwatch from sessionStartedAt
+// ---------------------------------------------------------------------------
+function SessionTimer({ startedAt }: { startedAt: number }) {
+  const [elapsed, setElapsed] = React.useState(0);
+
+  React.useEffect(() => {
+    setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  const display = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+
+  return (
+    <div className="flex items-center gap-1.5 text-primary">
+      <Clock className="h-4 w-4" />
+      <span className="font-bold tabular-nums">{display}</span>
+      <span className="text-muted-foreground">séance</span>
     </div>
   );
 }
@@ -541,14 +627,11 @@ function EntryCard({
   onToggleSuperset: () => void;
 }) {
   const { variantId, notes, sets, supersetGroup } = entry;
+  const getCatMeta = useCategoryMeta();
   const cat = exercise.category as ExerciseCategory;
-  const meta = CATEGORY_META[cat] ?? {
-    label: cat,
-    color: "#9ca3af",
-    emoji: "•",
-  };
+  const meta = getCatMeta(cat);
   const isStatic = exercise.isStatic;
-  const metricLabel = isStatic ? "Hold (s)" : "Reps";
+  const metricLabel = isStatic ? "Maintien (s)" : "Reps";
 
   const totalSetsCount = sets.length;
   const totalVolume = sets.reduce((a, s) => a + draftMetric(s), 0);
@@ -596,7 +679,7 @@ function EntryCard({
             </Badge>
             {isStatic && (
               <Badge variant="secondary" className="text-[10px]">
-                Hold
+                Maintien
               </Badge>
             )}
             {inSuperset && ssColor && ssLabel && (
@@ -604,7 +687,7 @@ function EntryCard({
                 variant="outline"
                 className="gap-1 border-transparent text-[10px] font-bold"
                 style={{ backgroundColor: `${ssColor}22`, color: ssColor }}
-                title={`Superset ${ssLabel} · ${supersetCount} exercise${supersetCount > 1 ? "s" : ""}`}
+                title={`Superset ${ssLabel} · ${supersetCount} exercice${supersetCount > 1 ? "s" : ""}`}
               >
                 <Link2 className="h-3 w-3" />
                 Superset {ssLabel}
@@ -619,15 +702,15 @@ function EntryCard({
               }
             >
               <SelectTrigger size="sm" className="h-8 w-40">
-                <SelectValue placeholder="Standard / None" />
+                <SelectValue placeholder="Standard / Aucune" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">Standard / None</SelectItem>
+                <SelectItem value="__none__">Standard / Aucune</SelectItem>
                 {sortedVariants.map((v) => (
                   <SelectItem key={v.id} value={v.id}>
                     {v.name}
                     <span className="ml-1 text-xs text-muted-foreground">
-                      · Lv {v.difficultyLevel}
+                      · Niv {v.difficultyLevel}
                     </span>
                   </SelectItem>
                 ))}
@@ -645,17 +728,17 @@ function EntryCard({
               onClick={onToggleSuperset}
               aria-label={
                 inSuperset
-                  ? "Remove from superset"
+                  ? "Retirer du superset"
                   : canJoinPrevSuperset
-                    ? "Join previous superset"
-                    : "Start a new superset here"
+                    ? "Rejoindre le superset précédent"
+                    : "Démarrer un nouveau superset ici"
               }
               title={
                 inSuperset
-                  ? "Remove from superset"
+                  ? "Retirer du superset"
                   : canJoinPrevSuperset
-                    ? "Join the previous exercise's superset"
-                    : "Start a new superset"
+                    ? "Rejoindre le superset de l'exercice précédent"
+                    : "Démarrer un nouveau superset"
               }
             >
               {inSuperset ? (
@@ -668,7 +751,7 @@ function EntryCard({
               size="icon"
               variant="ghost"
               onClick={onRemove}
-              aria-label={`Remove ${exercise.name}`}
+              aria-label={`Retirer ${exercise.name}`}
               className="h-8 w-8 text-muted-foreground hover:text-destructive"
             >
               <Trash2 className="h-4 w-4" />
@@ -682,19 +765,18 @@ function EntryCard({
             className="text-xs font-medium"
             style={{ color: ssColor }}
           >
-            ↳ Superset {ssLabel}: perform the next{" "}
-            {supersetCount - 1} exercise{supersetCount - 1 > 1 ? "s" : ""} back-to-back without rest.
+            ↳ Superset {ssLabel} : enchaîne les {supersetCount - 1} exercice{supersetCount - 1 > 1 ? "s" : ""} suivant{supersetCount - 1 > 1 ? "s" : ""} sans repos.
           </p>
         )}
       </CardHeader>
 
       <CardContent className="space-y-4">
         <Input
-          placeholder="Form cues..."
+          placeholder="Indices d'exécution..."
           value={notes}
           onChange={(e) => onChange({ notes: e.target.value })}
           className="h-8"
-          aria-label={`Notes for ${exercise.name}`}
+          aria-label={`Notes pour ${exercise.name}`}
         />
 
         {/* Desktop: inline table */}
@@ -702,12 +784,12 @@ function EntryCard({
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs uppercase text-muted-foreground">
-                <th className="w-10 pb-2 text-left font-medium">Set</th>
+                <th className="w-10 pb-2 text-left font-medium">Série</th>
                 <th className="pb-2 text-left font-medium">{metricLabel}</th>
-                <th className="pb-2 text-left font-medium">Weight (kg)</th>
+                <th className="pb-2 text-left font-medium">Poids (kg)</th>
                 <th className="pb-2 text-left font-medium">RPE</th>
-                <th className="w-20 pb-2 text-center font-medium">Done</th>
-                <th className="w-24 pb-2 text-right font-medium">Rest</th>
+                <th className="w-20 pb-2 text-center font-medium">Fait</th>
+                <th className="w-24 pb-2 text-right font-medium">Repos</th>
                 <th className="w-10 pb-2" />
               </tr>
             </thead>
@@ -731,7 +813,7 @@ function EntryCard({
                     colSpan={7}
                     className="py-3 text-center text-xs text-muted-foreground"
                   >
-                    No sets yet — add one below.
+                    Aucune série pour le moment — ajoute-en une ci-dessous.
                   </td>
                 </tr>
               )}
@@ -756,14 +838,14 @@ function EntryCard({
           ))}
           {sets.length === 0 && (
             <p className="py-3 text-center text-xs text-muted-foreground">
-              No sets yet — add one below.
+              Aucune série pour le moment — ajoute-en une ci-dessous.
             </p>
           )}
         </div>
 
         <Button variant="outline" size="sm" onClick={onAddSet}>
           <Plus className="h-4 w-4" />
-          Add Set
+          Ajouter une série
         </Button>
 
         <Separator />
@@ -774,7 +856,7 @@ function EntryCard({
             <span className="font-medium text-foreground tabular-nums">
               {totalSetsCount}
             </span>{" "}
-            sets
+            séries
           </span>
           <span>
             Volume{" "}
@@ -784,7 +866,7 @@ function EntryCard({
             {metricUnit(isStatic)}
           </span>
           <span>
-            Best{" "}
+            Meilleure{" "}
             <span className="font-medium text-foreground tabular-nums">
               {fmtCompact(bestSet)}
             </span>{" "}
@@ -792,7 +874,7 @@ function EntryCard({
           </span>
           {validatedCount > 0 && (
             <span className="text-emerald-500">
-              <span className="font-medium tabular-nums">{validatedCount}</span> validated
+              <span className="font-medium tabular-nums">{validatedCount}</span> validée{validatedCount > 1 ? "s" : ""}
             </span>
           )}
         </div>
@@ -859,7 +941,7 @@ function RestButton({
           e.preventDefault();
           setOpen(true);
         }}
-        title="Click to start rest · Right-click for presets"
+        title="Clic pour lancer le repos · Clic droit pour les préréglages"
       >
         <Coffee className="h-3.5 w-3.5" />
         <span className="tabular-nums">{defaultRestSec}s</span>
@@ -929,7 +1011,7 @@ function SetRowDesktop({
         <NumberInput
           value={isStatic ? set.holdSeconds : set.reps}
           placeholder={isStatic ? "30" : "8"}
-          aria-label={`${metricLabel} for set ${idx + 1}`}
+          aria-label={`${metricLabel} pour la série ${idx + 1}`}
           onChange={(n) =>
             onUpdate(isStatic ? { holdSeconds: n } : { reps: n })
           }
@@ -940,7 +1022,7 @@ function SetRowDesktop({
           value={set.weightKg}
           placeholder="0"
           step={0.5}
-          aria-label={`Weight for set ${idx + 1}`}
+          aria-label={`Poids pour la série ${idx + 1}`}
           onChange={(n) => onUpdate({ weightKg: n })}
         />
       </td>
@@ -950,7 +1032,7 @@ function SetRowDesktop({
           placeholder="7"
           min={1}
           max={10}
-          aria-label={`RPE for set ${idx + 1}`}
+          aria-label={`RPE pour la série ${idx + 1}`}
           onChange={(n) => onUpdate({ rpe: n })}
         />
       </td>
@@ -958,7 +1040,7 @@ function SetRowDesktop({
         <ValidateButton
           validated={validated}
           onClick={() => onValidate(!validated)}
-          label={`Mark set ${idx + 1} as ${validated ? "not done" : "done"}`}
+          label={`Marquer la série ${idx + 1} comme ${validated ? "non faite" : "faite"}`}
         />
       </td>
       <td className="py-2 text-right">
@@ -970,7 +1052,7 @@ function SetRowDesktop({
           variant="ghost"
           className="h-8 w-8 text-muted-foreground hover:text-destructive"
           onClick={onRemove}
-          aria-label={`Delete set ${idx + 1}`}
+          aria-label={`Supprimer la série ${idx + 1}`}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
@@ -1010,20 +1092,20 @@ function SetRowMobile({
     >
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground tabular-nums">
-          Set {idx + 1}
+          Série {idx + 1}
         </span>
         <div className="flex items-center gap-1">
           <ValidateButton
             validated={validated}
             onClick={() => onValidate(!validated)}
-            label={`Mark set ${idx + 1} as ${validated ? "not done" : "done"}`}
+            label={`Marquer la série ${idx + 1} comme ${validated ? "non faite" : "faite"}`}
           />
           <Button
             size="icon"
             variant="ghost"
             className="h-7 w-7 text-muted-foreground hover:text-destructive"
             onClick={onRemove}
-            aria-label={`Delete set ${idx + 1}`}
+            aria-label={`Supprimer la série ${idx + 1}`}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
@@ -1039,7 +1121,7 @@ function SetRowMobile({
           }
         />
         <LabeledNumber
-          label="Weight (kg)"
+          label="Poids (kg)"
           value={set.weightKg}
           placeholder="0"
           step={0.5}
@@ -1172,6 +1254,7 @@ function ExercisePickerDialog({
   exercises: ExerciseWithVariants[];
   onPick: (e: ExerciseWithVariants) => void;
 }) {
+  const getCatMeta = useCategoryMeta();
   const grouped = React.useMemo(() => {
     const map = new Map<ExerciseCategory, ExerciseWithVariants[]>();
     for (const ex of exercises) {
@@ -1189,20 +1272,16 @@ function ExercisePickerDialog({
     <CommandDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Add an exercise"
-      description="Search and pick an exercise to add to your workout."
+      title="Ajouter un exercice"
+      description="Recherche et choisis un exercice à ajouter à ta séance."
       className="sm:max-w-md"
     >
       <Command>
-        <CommandInput placeholder="Search exercises..." />
+        <CommandInput placeholder="Rechercher un exercice..." />
         <CommandList>
-          <CommandEmpty>No exercise found.</CommandEmpty>
+          <CommandEmpty>Aucun exercice trouvé.</CommandEmpty>
           {grouped.map(([cat, list]) => {
-            const meta = CATEGORY_META[cat] ?? {
-              label: cat,
-              color: "#9ca3af",
-              emoji: "•",
-            };
+            const meta = getCatMeta(cat);
             return (
               <CommandGroup
                 key={cat}
@@ -1220,7 +1299,7 @@ function ExercisePickerDialog({
                     <span className="flex-1 truncate">{ex.name}</span>
                     {ex.isStatic && (
                       <Badge variant="secondary" className="text-[10px]">
-                        Hold
+                        Maintien
                       </Badge>
                     )}
                   </CommandItem>

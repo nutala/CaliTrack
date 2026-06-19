@@ -42,6 +42,7 @@ export type WorkoutDraft = {
   notes: string;
   defaultRestSec: number;
   entries: DraftEntry[];
+  sessionStartedAt: number | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -68,6 +69,7 @@ function emptyDraft(): WorkoutDraft {
     notes: "",
     defaultRestSec: 90,
     entries: [],
+    sessionStartedAt: null,
   };
 }
 
@@ -90,6 +92,14 @@ interface WorkoutDraftStore extends WorkoutDraft {
   updateSet: (entryId: string, setId: string, patch: Partial<DraftSet>) => void;
   removeSet: (entryId: string, setId: string) => void;
   validateSet: (entryId: string, setId: string, validated: boolean) => void;
+
+  /// Move an entry from one index to another (drag-and-drop reorder).
+  reorderEntries: (fromId: string, toId: string) => void;
+
+  /// Start the session timer (idempotent).
+  startSession: () => void;
+  /// Cancel the session: clear the draft + stop the timer.
+  cancelSession: () => void;
 
   resetDraft: () => void;
 
@@ -186,6 +196,24 @@ export const useDraftStore = create<WorkoutDraftStore>((set, get) => ({
       ),
     })),
 
+  reorderEntries: (fromId, toId) =>
+    set((s) => {
+      const fromIdx = s.entries.findIndex((e) => e.id === fromId);
+      const toIdx = s.entries.findIndex((e) => e.id === toId);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return s;
+      const next = [...s.entries];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return { entries: next };
+    }),
+
+  startSession: () => {
+    if (get().sessionStartedAt != null) return;
+    set({ sessionStartedAt: Date.now() });
+  },
+
+  cancelSession: () => set({ ...emptyDraft() }),
+
   resetDraft: () => set({ ...emptyDraft() }),
 
   loadFromWorkout: (workout, exerciseMap) => {
@@ -211,7 +239,7 @@ export const useDraftStore = create<WorkoutDraftStore>((set, get) => ({
       });
     }
     set({
-      title: workout.title ? `${workout.title} (repeat)` : "",
+      title: workout.title ? `${workout.title} (bis)` : "",
       date: format(new Date(), "yyyy-MM-dd"),
       durationMin: workout.durationMin ?? "",
       exertion: workout.perceivedExertion ?? 5,
@@ -219,6 +247,7 @@ export const useDraftStore = create<WorkoutDraftStore>((set, get) => ({
       notes: workout.notes ?? "",
       defaultRestSec: 90,
       entries,
+      sessionStartedAt: get().sessionStartedAt ?? Date.now(),
     });
   },
 }));
@@ -231,4 +260,12 @@ export function nextSupersetGroup(entries: DraftEntry[]): number {
   let n = 1;
   while (used.has(n)) n++;
   return n;
+}
+
+/// Selector helper: get the list of currently-used superset group numbers.
+export function usedSupersetGroups(entries: DraftEntry[]): number[] {
+  const used = new Set(
+    entries.map((e) => e.supersetGroup).filter((g): g is number => g != null),
+  );
+  return Array.from(used).sort((a, b) => a - b);
 }

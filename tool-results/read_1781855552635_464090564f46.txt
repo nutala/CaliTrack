@@ -1,0 +1,929 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import { useEffect, useMemo, useState } from "react";
+     5→import { motion } from "framer-motion";
+     6→import { format, parseISO } from "date-fns";
+     7→import {
+     8→  CartesianGrid,
+     9→  Cell,
+    10→  Line,
+    11→  LineChart,
+    12→  Pie,
+    13→  PieChart,
+    14→  XAxis,
+    15→  YAxis,
+    16→} from "recharts";
+    17→import {
+    18→  Activity,
+    19→  BarChart3,
+    20→  CalendarDays,
+    21→  ChevronRight,
+    22→  Dumbbell,
+    23→  Flame,
+    24→  TrendingUp,
+    25→  Trophy,
+    26→} from "lucide-react";
+    27→
+    28→import {
+    29→  CATEGORY_META,
+    30→  type ExerciseCategory,
+    31→  type ExerciseWithVariants,
+    32→} from "@/lib/types";
+    33→import {
+    34→  difficultyStars,
+    35→  fmtCompact,
+    36→  fmtDate,
+    37→  metricUnit,
+    38→  relativeFromNow,
+    39→} from "@/lib/calc";
+    40→import {
+    41→  useExercises,
+    42→  useOverview,
+    43→  useProgress,
+    44→  useTopExercises,
+    45→  useWorkouts,
+    46→} from "@/hooks/use-data";
+    47→import { useAppStore } from "@/lib/store";
+    48→import {
+    49→  EmptyState,
+    50→  SectionHeading,
+    51→  StatCard,
+    52→  StatCardSkeleton,
+    53→} from "@/components/app/common";
+    54→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+    55→import {
+    56→  Select,
+    57→  SelectContent,
+    58→  SelectItem,
+    59→  SelectTrigger,
+    60→  SelectValue,
+    61→} from "@/components/ui/select";
+    62→import { Badge } from "@/components/ui/badge";
+    63→import { ScrollArea } from "@/components/ui/scroll-area";
+    64→import {
+    65→  ChartContainer,
+    66→  ChartTooltip,
+    67→  ChartTooltipContent,
+    68→  type ChartConfig,
+    69→} from "@/components/ui/chart";
+    70→import { cn } from "@/lib/utils";
+    71→
+    72→// =====================================================
+    73→// Main export
+    74→// =====================================================
+    75→
+    76→export function DashboardView() {
+    77→  return (
+    78→    <div className="space-y-8">
+    79→      <FadeIn>
+    80→        <KpiGrid />
+    81→      </FadeIn>
+    82→
+    83→      <FadeIn delay={0.05}>
+    84→        <ProgressTracker />
+    85→      </FadeIn>
+    86→
+    87→      <FadeIn delay={0.1}>
+    88→        <div className="grid gap-6 lg:grid-cols-3">
+    89→          <div className="lg:col-span-2">
+    90→            <TopExercises />
+    91→          </div>
+    92→          <div>
+    93→            <RecentWorkouts />
+    94→          </div>
+    95→        </div>
+    96→      </FadeIn>
+    97→
+    98→      <FadeIn delay={0.15}>
+    99→        <div className="grid gap-6 lg:grid-cols-2">
+   100→          <ActivityStrip />
+   101→          <VolumeByCategory />
+   102→        </div>
+   103→      </FadeIn>
+   104→    </div>
+   105→  );
+   106→}
+   107→
+   108→// =====================================================
+   109→// Animation helper
+   110→// =====================================================
+   111→
+   112→function FadeIn({
+   113→  children,
+   114→  delay = 0,
+   115→}: {
+   116→  children: React.ReactNode;
+   117→  delay?: number;
+   118→}) {
+   119→  return (
+   120→    <motion.div
+   121→      initial={{ opacity: 0, y: 10 }}
+   122→      animate={{ opacity: 1, y: 0 }}
+   123→      transition={{ duration: 0.3, delay, ease: "easeOut" }}
+   124→    >
+   125→      {children}
+   126→    </motion.div>
+   127→  );
+   128→}
+   129→
+   130→// =====================================================
+   131→// 1. KPI Grid
+   132→// =====================================================
+   133→
+   134→function KpiGrid() {
+   135→  const { data, isLoading } = useOverview();
+   136→
+   137→  if (isLoading || !data) {
+   138→    return (
+   139→      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+   140→        {Array.from({ length: 4 }).map((_, i) => (
+   141→          <StatCardSkeleton key={i} />
+   142→        ))}
+   143→      </div>
+   144→    );
+   145→  }
+   146→
+   147→  const streakPositive = data.currentStreakDays > 0;
+   148→
+   149→  return (
+   150→    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+   151→      <StatCard
+   152→        label="Total Workouts"
+   153→        value={data.totalWorkouts}
+   154→        icon={Dumbbell}
+   155→        hint={
+   156→          data.lastWorkoutDate
+   157→            ? `Last: ${relativeFromNow(data.lastWorkoutDate)}`
+   158→            : "No workouts yet"
+   159→        }
+   160→      />
+   161→      <StatCard
+   162→        label="Current Streak"
+   163→        value={data.currentStreakDays}
+   164→        unit="days"
+   165→        icon={Flame}
+   166→        accent={streakPositive ? "success" : "default"}
+   167→        hint={`Longest: ${data.longestStreakDays}d`}
+   168→      />
+   169→      <StatCard
+   170→        label="This Week"
+   171→        value={data.thisWeekCount}
+   172→        unit="sessions"
+   173→        icon={CalendarDays}
+   174→        hint={`${data.totalSets} sets all-time`}
+   175→      />
+   176→      <StatCard
+   177→        label="Total Volume"
+   178→        value={fmtCompact(data.totalVolume)}
+   179→        icon={TrendingUp}
+   180→        hint="reps + holds"
+   181→      />
+   182→    </div>
+   183→  );
+   184→}
+   185→
+   186→// =====================================================
+   187→// 2. Progress Tracker (centerpiece)
+   188→// =====================================================
+   189→
+   190→const ALL_VARIANTS = "__all__";
+   191→
+   192→function ProgressTracker() {
+   193→  const exercisesQ = useExercises();
+   194→  const exercises = exercisesQ.data ?? [];
+   195→
+   196→  const [ex1Id, setEx1Id] = useState<string>("");
+   197→  const [ex1VariantId, setEx1VariantId] = useState<string>(ALL_VARIANTS);
+   198→  const [ex2Id, setEx2Id] = useState<string>("");
+   199→  const [ex2VariantId, setEx2VariantId] = useState<string>(ALL_VARIANTS);
+   200→
+   201→  // Default exercise 1 to the first available exercise (derived, no effect).
+   202→  const effectiveEx1Id = ex1Id || exercises[0]?.id || "";
+   203→
+   204→  const ex1 = exercises.find((e) => e.id === effectiveEx1Id);
+   205→  const ex2 = exercises.find((e) => e.id === ex2Id);
+   206→
+   207→  // Effective variant: only valid if it belongs to the current exercise.
+   208→  const effectiveEx1VariantId =
+   209→    ex1?.variants.some((v) => v.id === ex1VariantId)
+   210→      ? ex1VariantId
+   211→      : ALL_VARIANTS;
+   212→  const effectiveEx2VariantId =
+   213→    ex2?.variants.some((v) => v.id === ex2VariantId)
+   214→      ? ex2VariantId
+   215→      : ALL_VARIANTS;
+   216→
+   217→  const progress1 = useProgress(
+   218→    effectiveEx1Id || undefined,
+   219→    effectiveEx1VariantId === ALL_VARIANTS ? null : effectiveEx1VariantId,
+   220→  );
+   221→  const progress2 = useProgress(
+   222→    ex2Id || undefined,
+   223→    effectiveEx2VariantId === ALL_VARIANTS ? null : effectiveEx2VariantId,
+   224→  );
+   225→
+   226→  const points1 = progress1.data?.points;
+   227→  const points2 = progress2.data?.points;
+   228→
+   229→  // Merge series by date (sorted asc).
+   230→  const mergedData = useMemo(() => {
+   231→    const p1 = points1 ?? [];
+   232→    const p2 = points2 ?? [];
+   233→    const byDate = new Map<string, { ex1?: number; ex2?: number }>();
+   234→    for (const p of p1) {
+   235→      const entry = byDate.get(p.date) ?? {};
+   236→      entry.ex1 = p.bestValue;
+   237→      byDate.set(p.date, entry);
+   238→    }
+   239→    for (const p of p2) {
+   240→      const entry = byDate.get(p.date) ?? {};
+   241→      entry.ex2 = p.bestValue;
+   242→      byDate.set(p.date, entry);
+   243→    }
+   244→    return Array.from(byDate.entries())
+   245→      .map(([date, v]) => ({ date, ...v }))
+   246→      .sort((a, b) => (a.date < b.date ? -1 : 1));
+   247→  }, [points1, points2]);
+   248→
+   249→  const hasEx2 = !!ex2Id;
+   250→  const hasData = mergedData.length > 0;
+   251→
+   252→  const chartConfig: ChartConfig = {
+   253→    ex1: {
+   254→      label: ex1?.name ?? "Exercise 1",
+   255→      color: "var(--chart-1)",
+   256→    },
+   257→    ...(hasEx2
+   258→      ? {
+   259→          ex2: {
+   260→            label: ex2?.name ?? "Exercise 2",
+   261→            color: "var(--chart-2)",
+   262→          },
+   263→        }
+   264→      : {}),
+   265→  };
+   266→
+   267→  const tooltipFormatter: React.ComponentProps<
+   268→    typeof ChartTooltip
+   269→  >["formatter"] = (value, _name, item) => {
+   270→    const key = (item?.dataKey as string) ?? "ex1";
+   271→    const ex = key === "ex2" ? ex2 : ex1;
+   272→    const unit = metricUnit(ex?.isStatic ?? false);
+   273→    const color = key === "ex2" ? "var(--chart-2)" : "var(--chart-1)";
+   274→    return (
+   275→      <div className="flex w-full items-center gap-2">
+   276→        <span
+   277→          className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+   278→          style={{ backgroundColor: color }}
+   279→        />
+   280→        <span className="text-muted-foreground">{ex?.name ?? key}</span>
+   281→        <span className="ml-auto font-mono font-medium tabular-nums text-foreground">
+   282→          {Number(value).toLocaleString()}
+   283→          <span className="ml-1 font-sans text-muted-foreground">{unit}</span>
+   284→        </span>
+   285→      </div>
+   286→    );
+   287→  };
+   288→
+   289→  return (
+   290→    <Card>
+   291→      <CardHeader>
+   292→        <div className="flex items-center gap-2">
+   293→          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+   294→            <Activity className="h-4 w-4" />
+   295→          </div>
+   296→          <div>
+   297→            <CardTitle>Progress Tracker</CardTitle>
+   298→            <p className="mt-0.5 text-xs text-muted-foreground">
+   299→              Best performance per workout over time.
+   300→            </p>
+   301→          </div>
+   302→        </div>
+   303→      </CardHeader>
+   304→
+   305→      <CardContent className="space-y-4">
+   306→        {/* Control row */}
+   307→        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+   308→          <LabeledSelect
+   309→            label="Exercise 1"
+   310→            value={effectiveEx1Id}
+   311→            onValueChange={(v) => {
+   312→              setEx1Id(v);
+   313→              setEx1VariantId(ALL_VARIANTS);
+   314→            }}
+   315→            placeholder="Select…"
+   316→          >
+   317→            {exercises.map((e) => (
+   318→              <SelectItem key={e.id} value={e.id}>
+   319→                {e.name}
+   320→              </SelectItem>
+   321→            ))}
+   322→          </LabeledSelect>
+   323→
+   324→          {ex1 && (
+   325→            <LabeledSelect
+   326→              label="Variant 1"
+   327→              value={effectiveEx1VariantId}
+   328→              onValueChange={setEx1VariantId}
+   329→            >
+   330→              <SelectItem value={ALL_VARIANTS}>All variants</SelectItem>
+   331→              {ex1.variants.map((v) => (
+   332→                <SelectItem key={v.id} value={v.id}>
+   333→                  {v.name}
+   334→                </SelectItem>
+   335→              ))}
+   336→            </LabeledSelect>
+   337→          )}
+   338→
+   339→          <LabeledSelect
+   340→            label="Exercise 2 (optional)"
+   341→            value={ex2Id || "__none__"}
+   342→            onValueChange={(v) => {
+   343→              setEx2Id(v === "__none__" ? "" : v);
+   344→              setEx2VariantId(ALL_VARIANTS);
+   345→            }}
+   346→          >
+   347→            <SelectItem value="__none__">None</SelectItem>
+   348→            {exercises
+   349→              .filter((e) => e.id !== effectiveEx1Id)
+   350→              .map((e) => (
+   351→                <SelectItem key={e.id} value={e.id}>
+   352→                  {e.name}
+   353→                </SelectItem>
+   354→              ))}
+   355→          </LabeledSelect>
+   356→
+   357→          {ex2 && (
+   358→            <LabeledSelect
+   359→              label="Variant 2"
+   360→              value={effectiveEx2VariantId}
+   361→              onValueChange={setEx2VariantId}
+   362→            >
+   363→              <SelectItem value={ALL_VARIANTS}>All variants</SelectItem>
+   364→              {ex2.variants.map((v) => (
+   365→                <SelectItem key={v.id} value={v.id}>
+   366→                  {v.name}
+   367→                </SelectItem>
+   368→              ))}
+   369→            </LabeledSelect>
+   370→          )}
+   371→        </div>
+   372→
+   373→        {/* Chart or empty */}
+   374→        {hasData ? (
+   375→          <ChartContainer
+   376→            config={chartConfig}
+   377→            className="aspect-auto h-[300px] w-full"
+   378→          >
+   379→            <LineChart
+   380→              data={mergedData}
+   381→              margin={{ left: 4, right: 12, top: 8, bottom: 0 }}
+   382→            >
+   383→              <CartesianGrid
+   384→                strokeDasharray="3 3"
+   385→                vertical={false}
+   386→                className="stroke-border/50"
+   387→              />
+   388→              <XAxis
+   389→                dataKey="date"
+   390→                tickLine={false}
+   391→                axisLine={false}
+   392→                tickMargin={8}
+   393→                minTickGap={24}
+   394→                tickFormatter={(d: string) => {
+   395→                  try {
+   396→                    return format(parseISO(d), "dd MMM");
+   397→                  } catch {
+   398→                    return d;
+   399→                  }
+   400→                }}
+   401→              />
+   402→              <YAxis
+   403→                tickLine={false}
+   404→                axisLine={false}
+   405→                width={36}
+   406→                tickMargin={4}
+   407→                allowDecimals={false}
+   408→              />
+   409→              <ChartTooltip
+   410→                content={
+   411→                  <ChartTooltipContent
+   412→                    formatter={tooltipFormatter}
+   413→                    labelFormatter={(_, payload) => {
+   414→                      const dateStr = payload?.[0]?.payload?.date as
+   415→                        | string
+   416→                        | undefined;
+   417→                      if (!dateStr) return null;
+   418→                      try {
+   419→                        return (
+   420→                          <div className="font-medium">
+   421→                            {format(parseISO(dateStr), "dd MMM yyyy")}
+   422→                          </div>
+   423→                        );
+   424→                      } catch {
+   425→                        return dateStr;
+   426→                      }
+   427→                    }}
+   428→                    hideIndicator
+   429→                  />
+   430→                }
+   431→              />
+   432→              <Line
+   433→                type="monotone"
+   434→                dataKey="ex1"
+   435→                stroke="var(--color-ex1)"
+   436→                strokeWidth={2}
+   437→                dot={{ r: 3, fill: "var(--color-ex1)", strokeWidth: 0 }}
+   438→                activeDot={{ r: 4 }}
+   439→                connectNulls
+   440→              />
+   441→              {hasEx2 && (
+   442→                <Line
+   443→                  type="monotone"
+   444→                  dataKey="ex2"
+   445→                  stroke="var(--color-ex2)"
+   446→                  strokeWidth={2}
+   447→                  strokeDasharray="4 3"
+   448→                  dot={{ r: 3, fill: "var(--color-ex2)", strokeWidth: 0 }}
+   449→                  activeDot={{ r: 4 }}
+   450→                  connectNulls
+   451→                />
+   452→              )}
+   453→            </LineChart>
+   454→          </ChartContainer>
+   455→        ) : (
+   456→          <EmptyState
+   457→            icon={Activity}
+   458→            title="No progress data yet"
+   459→            description={
+   460→              ex1
+   461→                ? `Log a workout with "${ex1.name}" to start tracking your progression here.`
+   462→                : "Pick an exercise to start tracking your progression."
+   463→            }
+   464→            className="min-h-[200px]"
+   465→          />
+   466→        )}
+   467→      </CardContent>
+   468→    </Card>
+   469→  );
+   470→}
+   471→
+   472→function LabeledSelect({
+   473→  label,
+   474→  value,
+   475→  onValueChange,
+   476→  placeholder,
+   477→  children,
+   478→}: {
+   479→  label: string;
+   480→  value: string;
+   481→  onValueChange: (v: string) => void;
+   482→  placeholder?: string;
+   483→  children: React.ReactNode;
+   484→}) {
+   485→  return (
+   486→    <div className="flex flex-col gap-1.5">
+   487→      <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+   488→        {label}
+   489→      </label>
+   490→      <Select value={value} onValueChange={onValueChange}>
+   491→        <SelectTrigger className="w-full">
+   492→          <SelectValue placeholder={placeholder} />
+   493→        </SelectTrigger>
+   494→        <SelectContent>{children}</SelectContent>
+   495→      </Select>
+   496→    </div>
+   497→  );
+   498→}
+   499→
+   500→// =====================================================
+   501→// 3. Top Exercises
+   502→// =====================================================
+   503→
+   504→function TopExercises() {
+   505→  const { data, isLoading } = useTopExercises();
+   506→  const exercisesMap = useExercisesMap();
+   507→
+   508→  return (
+   509→    <div>
+   510→      <SectionHeading
+   511→        title="Top Exercises"
+   512→        subtitle="Most-performed moves recently"
+   513→      />
+   514→      {isLoading ? (
+   515→        <div className="grid gap-3 sm:grid-cols-2">
+   516→          {Array.from({ length: 4 }).map((_, i) => (
+   517→            <Card key={i}>
+   518→              <CardContent className="space-y-2 p-4">
+   519→                <div className="h-4 w-2/3 rounded bg-muted/60" />
+   520→                <div className="h-3 w-1/3 rounded bg-muted/40" />
+   521→              </CardContent>
+   522→            </Card>
+   523→          ))}
+   524→        </div>
+   525→      ) : !data || data.length === 0 ? (
+   526→        <Card>
+   527→          <CardContent className="py-10">
+   528→            <EmptyState
+   529→              icon={Trophy}
+   530→              title="No exercises tracked yet"
+   531→              description="Log your first workout to see your top moves here."
+   532→            />
+   533→          </CardContent>
+   534→        </Card>
+   535→      ) : (
+   536→        <ScrollArea className="w-full pb-2">
+   537→          <div className="flex gap-3 overflow-x-auto pb-1">
+   538→            {data.map((te) => {
+   539→              const cat = CATEGORY_META[te.category as ExerciseCategory];
+   540→              const ex = exercisesMap.get(te.exerciseId);
+   541→              const variant = ex?.variants.find(
+   542→                (v) => v.name === te.topVariantName,
+   543→              );
+   544→              const level = variant?.difficultyLevel ?? 0;
+   545→              return (
+   546→                <Card
+   547→                  key={te.exerciseId}
+   548→                  className="min-w-[240px] flex-1 gap-0 p-4"
+   549→                >
+   550→                  <CardContent className="space-y-3 p-0">
+   551→                    <div className="flex items-start justify-between gap-2">
+   552→                      <h3 className="line-clamp-1 text-sm font-semibold leading-tight">
+   553→                        {te.exerciseName}
+   554→                      </h3>
+   555→                      <Badge
+   556→                        variant="secondary"
+   557→                        className="shrink-0 gap-1 border-transparent text-white"
+   558→                        style={{
+   559→                          backgroundColor: cat?.color ?? "#6b7280",
+   560→                        }}
+   561→                      >
+   562→                        <span>{cat?.emoji}</span>
+   563→                        <span className="hidden sm:inline">
+   564→                          {cat?.label ?? te.category}
+   565→                        </span>
+   566→                      </Badge>
+   567→                    </div>
+   568→
+   569→                    <div className="grid grid-cols-2 gap-2 text-xs">
+   570→                      <div>
+   571→                        <div className="text-muted-foreground">Sessions</div>
+   572→                        <div className="text-base font-semibold tabular-nums text-foreground">
+   573→                          {te.sessions}
+   574→                        </div>
+   575→                      </div>
+   576→                      <div>
+   577→                        <div className="text-muted-foreground">
+   578→                          Best ({metricUnit(te.isStatic)})
+   579→                        </div>
+   580→                        <div className="text-base font-semibold tabular-nums text-foreground">
+   581→                          {te.bestValue}
+   582→                        </div>
+   583→                      </div>
+   584→                    </div>
+   585→
+   586→                    <div className="space-y-1 border-t border-border/60 pt-2 text-xs">
+   587→                      <div className="flex items-center justify-between gap-2">
+   588→                        <span className="text-muted-foreground">Top variant</span>
+   589→                        <span className="truncate font-medium text-foreground">
+   590→                          {te.topVariantName ?? "Standard"}
+   591→                        </span>
+   592→                      </div>
+   593→                      <div className="flex items-center justify-between gap-2">
+   594→                        <span className="text-muted-foreground">Difficulty</span>
+   595→                        <span className="text-amber-500">
+   596→                          {difficultyStars(level || 3)}
+   597→                        </span>
+   598→                      </div>
+   599→                      <div className="flex items-center justify-between gap-2">
+   600→                        <span className="text-muted-foreground">Last done</span>
+   601→                        <span className="font-medium text-foreground">
+   602→                          {relativeFromNow(te.lastPerformed)}
+   603→                        </span>
+   604→                      </div>
+   605→                    </div>
+   606→                  </CardContent>
+   607→                </Card>
+   608→              );
+   609→            })}
+   610→          </div>
+   611→        </ScrollArea>
+   612→      )}
+   613→    </div>
+   614→  );
+   615→}
+   616→
+   617→function useExercisesMap() {
+   618→  const { data } = useExercises();
+   619→  return useMemo(() => {
+   620→    const map = new Map<string, ExerciseWithVariants>();
+   621→    data?.forEach((e) => map.set(e.id, e));
+   622→    return map;
+   623→  }, [data]);
+   624→}
+   625→
+   626→// =====================================================
+   627→// 4. Recent Workouts
+   628→// =====================================================
+   629→
+   630→function RecentWorkouts() {
+   631→  const { data, isLoading } = useWorkouts();
+   632→  const setView = useAppStore((s) => s.setView);
+   633→
+   634→  const recent = (data ?? []).slice(0, 4);
+   635→
+   636→  return (
+   637→    <div>
+   638→      <SectionHeading
+   639→        title="Recent Workouts"
+   640→        subtitle="Your latest sessions"
+   641→      />
+   642→      <Card className="gap-0">
+   643→        <CardContent className="p-0">
+   644→          {isLoading ? (
+   645→            <div className="space-y-2 p-3">
+   646→              {Array.from({ length: 4 }).map((_, i) => (
+   647→                <div
+   648→                  key={i}
+   649→                  className="h-14 rounded-md bg-muted/40"
+   650→                />
+   651→              ))}
+   652→            </div>
+   653→          ) : recent.length === 0 ? (
+   654→            <div className="p-4">
+   655→              <EmptyState
+   656→                icon={CalendarDays}
+   657→                title="No workouts yet"
+   658→                description="Your logged sessions will show up here."
+   659→              />
+   660→            </div>
+   661→          ) : (
+   662→            <ul className="divide-y divide-border/60">
+   663→              {recent.map((w) => {
+   664→                const totalSets = w.entries.reduce(
+   665→                  (acc, e) => acc + e.sets.length,
+   666→                  0,
+   667→                );
+   668→                return (
+   669→                  <li key={w.id}>
+   670→                    <button
+   671→                      type="button"
+   672→                      onClick={() => useAppStore.getState().setView("history")}
+   673→                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+   674→                    >
+   675→                      <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-muted/60 text-foreground">
+   676→                        <span className="text-[10px] uppercase leading-none text-muted-foreground">
+   677→                          {fmtDate(w.date, "MMM")}
+   678→                        </span>
+   679→                        <span className="text-sm font-bold leading-none tabular-nums">
+   680→                          {fmtDate(w.date, "dd")}
+   681→                        </span>
+   682→                      </div>
+   683→
+   684→                      <div className="min-w-0 flex-1">
+   685→                        <div className="truncate text-sm font-medium text-foreground">
+   686→                          {w.title || "Untitled"}
+   687→                        </div>
+   688→                        <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+   689→                          <span>{fmtDate(w.date)}</span>
+   690→                          <span aria-hidden>·</span>
+   691→                          <span className="tabular-nums">
+   692→                            {w.entries.length}{" "}
+   693→                            {w.entries.length === 1 ? "entry" : "entries"}
+   694→                          </span>
+   695→                          <span aria-hidden>·</span>
+   696→                          <span className="tabular-nums">{totalSets} sets</span>
+   697→                        </div>
+   698→                      </div>
+   699→
+   700→                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+   701→                    </button>
+   702→                  </li>
+   703→                );
+   704→              })}
+   705→            </ul>
+   706→          )}
+   707→        </CardContent>
+   708→      </Card>
+   709→      {recent.length > 0 && (
+   710→        <div className="mt-2 flex justify-end">
+   711→          <button
+   712→            type="button"
+   713→            onClick={() => setView("history")}
+   714→            className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+   715→          >
+   716→            View all →
+   717→          </button>
+   718→        </div>
+   719→      )}
+   720→    </div>
+   721→  );
+   722→}
+   723→
+   724→// =====================================================
+   725→// 5. Activity Strip (last 30 days)
+   726→// =====================================================
+   727→
+   728→function ActivityStrip() {
+   729→  const { data } = useOverview();
+   730→  const calendar = data?.activityCalendar ?? [];
+   731→
+   732→  const maxVolume = useMemo(
+   733→    () => calendar.reduce((m, d) => Math.max(m, d.volume ?? 0), 0),
+   734→    [calendar],
+   735→  );
+   736→
+   737→  return (
+   738→    <Card>
+   739→      <CardHeader>
+   740→        <div className="flex items-center gap-2">
+   741→          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+   742→            <CalendarDays className="h-4 w-4" />
+   743→          </div>
+   744→          <div>
+   745→            <CardTitle>Activity</CardTitle>
+   746→            <p className="mt-0.5 text-xs text-muted-foreground">
+   747→              Last 30 days · volume per day
+   748→            </p>
+   749→          </div>
+   750→        </div>
+   751→      </CardHeader>
+   752→      <CardContent>
+   753→        {calendar.length === 0 ? (
+   754→          <EmptyState
+   755→            icon={CalendarDays}
+   756→            title="No activity yet"
+   757→            description="Your recent workout volume will appear here."
+   758→          />
+   759→        ) : (
+   760→          <div
+   761→            className="grid gap-1.5"
+   762→            style={{
+   763→              gridTemplateColumns: "repeat(30, minmax(0, 1fr))",
+   764→            }}
+   765→          >
+   766→            {calendar.map((day) => {
+   767→              const colorClass = activityColorClass(day.volume, maxVolume);
+   768→              const dateLabel = (() => {
+   769→                try {
+   770→                  return format(parseISO(day.date), "dd MMM yyyy");
+   771→                } catch {
+   772→                  return day.date;
+   773→                }
+   774→              })();
+   775→              return (
+   776→                <div
+   777→                  key={day.date}
+   778→                  className={cn(
+   779→                    "aspect-square rounded-sm transition-colors",
+   780→                    colorClass,
+   781→                  )}
+   782→                  title={`${dateLabel} · ${day.volume} volume`}
+   783→                />
+   784→              );
+   785→            })}
+   786→          </div>
+   787→        )}
+   788→      </CardContent>
+   789→    </Card>
+   790→  );
+   791→}
+   792→
+   793→function activityColorClass(volume: number, max: number): string {
+   794→  if (!volume || volume <= 0 || max <= 0) return "bg-muted/40";
+   795→  const ratio = volume / max;
+   796→  if (ratio <= 1 / 3) return "bg-emerald-500/40";
+   797→  if (ratio <= 2 / 3) return "bg-emerald-500/70";
+   798→  return "bg-emerald-500";
+   799→}
+   800→
+   801→// =====================================================
+   802→// 6. Volume by Category donut
+   803→// =====================================================
+   804→
+   805→function VolumeByCategory() {
+   806→  const { data } = useOverview();
+   807→  const slices = (data?.volumeByCategory ?? []).filter((s) => s.volume > 0);
+   808→
+   809→  const totalVolume = slices.reduce((acc, s) => acc + s.volume, 0);
+   810→
+   811→  const chartConfig: ChartConfig = {};
+   812→  for (const s of slices) {
+   813→    const meta = CATEGORY_META[s.category as ExerciseCategory];
+   814→    chartConfig[s.category] = {
+   815→      label: meta?.label ?? s.category,
+   816→      color: meta?.color ?? "#6b7280",
+   817→    };
+   818→  }
+   819→
+   820→  return (
+   821→    <Card>
+   822→      <CardHeader>
+   823→        <div className="flex items-center gap-2">
+   824→          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+   825→            <BarChart3 className="h-4 w-4" />
+   826→          </div>
+   827→          <div>
+   828→            <CardTitle>Volume by Category</CardTitle>
+   829→            <p className="mt-0.5 text-xs text-muted-foreground">
+   830→              Distribution across muscle groups
+   831→            </p>
+   832→          </div>
+   833→        </div>
+   834→      </CardHeader>
+   835→      <CardContent>
+   836→        {slices.length === 0 ? (
+   837→          <EmptyState
+   838→            icon={BarChart3}
+   839→            title="No category data"
+   840→            description="Log workouts to break down volume by category."
+   841→          />
+   842→        ) : (
+   843→          <div className="grid items-center gap-4 sm:grid-cols-2">
+   844→            <div className="relative mx-auto h-[220px] w-full max-w-[260px]">
+   845→              <ChartContainer
+   846→                config={chartConfig}
+   847→                className="aspect-square h-full w-full"
+   848→              >
+   849→                <PieChart>
+   850→                  <ChartTooltip
+   851→                    content={
+   852→                      <ChartTooltipContent
+   853→                        nameKey="category"
+   854→                        hideLabel
+   855→                      />
+   856→                    }
+   857→                  />
+   858→                  <Pie
+   859→                    data={slices}
+   860→                    dataKey="volume"
+   861→                    nameKey="category"
+   862→                    innerRadius="62%"
+   863→                    outerRadius="92%"
+   864→                    paddingAngle={2}
+   865→                    strokeWidth={0}
+   866→                  >
+   867→                    {slices.map((s) => {
+   868→                      const meta = CATEGORY_META[
+   869→                        s.category as ExerciseCategory
+   870→                      ];
+   871→                      return (
+   872→                        <Cell
+   873→                          key={s.category}
+   874→                          fill={meta?.color ?? "#6b7280"}
+   875→                        />
+   876→                      );
+   877→                    })}
+   878→                  </Pie>
+   879→                </PieChart>
+   880→              </ChartContainer>
+   881→              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+   882→                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+   883→                  Total
+   884→                </span>
+   885→                <span className="text-xl font-bold tabular-nums text-foreground">
+   886→                  {fmtCompact(totalVolume)}
+   887→                </span>
+   888→              </div>
+   889→            </div>
+   890→
+   891→            <ul className="space-y-1.5">
+   892→              {slices
+   893→                .slice()
+   894→                .sort((a, b) => b.volume - a.volume)
+   895→                .map((s) => {
+   896→                  const meta = CATEGORY_META[s.category as ExerciseCategory];
+   897→                  const pct =
+   898→                    totalVolume > 0
+   899→                      ? Math.round((s.volume / totalVolume) * 100)
+   900→                      : 0;
+   901→                  return (
+   902→                    <li
+   903→                      key={s.category}
+   904→                      className="flex items-center gap-2 text-sm"
+   905→                    >
+   906→                      <span
+   907→                        className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+   908→                        style={{ backgroundColor: meta?.color ?? "#6b7280" }}
+   909→                      />
+   910→                      <span className="flex-1 truncate text-foreground">
+   911→                        {meta?.emoji} {meta?.label ?? s.category}
+   912→                      </span>
+   913→                      <span className="text-muted-foreground tabular-nums">
+   914→                        {fmtCompact(s.volume)}
+   915→                      </span>
+   916→                      <span className="w-9 text-right text-xs text-muted-foreground tabular-nums">
+   917→                        {pct}%
+   918→                      </span>
+   919→                    </li>
+   920→                  );
+   921→                })}
+   922→            </ul>
+   923→          </div>
+   924→        )}
+   925→      </CardContent>
+   926→    </Card>
+   927→  );
+   928→}
+   929→

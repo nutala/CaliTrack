@@ -206,6 +206,25 @@ async function main() {
   await db.workout.deleteMany();
   await db.exerciseVariant.deleteMany();
   await db.exercise.deleteMany();
+  await db.category.deleteMany();
+  await db.user.deleteMany();
+
+  // Create the demo Google user that owns the seed workouts.
+  const demoUser = await db.user.create({
+    data: {
+      email: "alex.athlete@gmail.com",
+      name: "Alex Athlète",
+      image: "https://i.pravatar.cc/150?img=68",
+    },
+  });
+  console.log(`  ✓ Demo user: ${demoUser.email}`);
+
+  // Seed default categories for the demo user.
+  const { DEFAULT_CATEGORIES } = await import("../src/lib/default-categories");
+  await db.category.createMany({
+    data: DEFAULT_CATEGORIES.map((c) => ({ ...c, userId: demoUser.id })),
+  });
+  console.log(`  ✓ ${DEFAULT_CATEGORIES.length} default categories`);
 
   const exerciseIdMap = new Map<string, string>();
 
@@ -282,15 +301,17 @@ async function main() {
         perceivedExertion: 6 + Math.floor(Math.random() * 4),
         bodyweightKg: 72,
         notes: "",
+        userId: demoUser.id,
       },
     });
-    for (const e of w.entries) {
+    for (let ei = 0; ei < w.entries.length; ei++) {
+      const e = w.entries[ei];
       const exerciseId = exerciseIdMap.get(e.ex)!;
       const variant = await db.exerciseVariant.findFirst({
         where: { exerciseId, name: e.variant },
       });
       const entry = await db.workoutEntry.create({
-        data: { workoutId: workout.id, exerciseId, variantId: variant?.id },
+        data: { workoutId: workout.id, exerciseId, variantId: variant?.id, position: ei + 1 },
       });
       await db.workoutSet.createMany({
         data: e.sets.map((s, i) => ({

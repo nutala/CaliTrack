@@ -12,11 +12,10 @@ import {
   Repeat,
   Star,
   Target,
+  Palette,
 } from "lucide-react";
 
 import {
-  CATEGORIES,
-  CATEGORY_META,
   type ExerciseCategory,
   type ExerciseWithVariants,
   type ExerciseVariant,
@@ -30,7 +29,10 @@ import {
   useAddVariant,
   useUpdateVariant,
   useDeleteVariant,
+  useCategories,
+  useCategoryMeta,
 } from "@/hooks/use-data";
+import { CategoryManagerDialog } from "@/components/app/category-manager-dialog";
 import { EmptyState, SectionHeading } from "@/components/app/common";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -97,7 +99,7 @@ interface VariantFormState {
 const EMPTY_EXERCISE_FORM: ExerciseFormState = {
   name: "",
   category: "Push",
-  muscleGroup: "Full body",
+  muscleGroup: "Corps complet",
   isStatic: false,
   description: "",
   equipment: "",
@@ -116,6 +118,8 @@ const EMPTY_VARIANT_FORM: VariantFormState = {
 
 export function ExercisesView() {
   const { data: exercises, isLoading } = useExercises();
+  const { data: categoryList } = useCategories();
+  const getCatMeta = useCategoryMeta();
   const createExercise = useCreateExercise();
   const updateExercise = useUpdateExercise();
   const deleteExercise = useDeleteExercise();
@@ -123,11 +127,20 @@ export function ExercisesView() {
   const updateVariant = useUpdateVariant();
   const deleteVariant = useDeleteVariant();
 
+  // Dynamic category list (fall back to empty array while loading).
+  const categories: ExerciseCategory[] = React.useMemo(
+    () => (categoryList ?? []).map((c) => c.name),
+    [categoryList],
+  );
+
   // Filters
   const [search, setSearch] = React.useState("");
   const [activeCategories, setActiveCategories] = React.useState<Set<ExerciseCategory>>(
     new Set(),
   );
+
+  // Category manager dialog
+  const [categoryDialogOpen, setCategoryDialogOpen] = React.useState(false);
 
   // Exercise dialog state
   const [exerciseDialogOpen, setExerciseDialogOpen] = React.useState(false);
@@ -167,14 +180,14 @@ export function ExercisesView() {
 
   const grouped = React.useMemo(() => {
     const map = new Map<ExerciseCategory, ExerciseWithVariants[]>();
-    for (const cat of CATEGORIES) map.set(cat, []);
+    for (const cat of categories) map.set(cat, []);
     for (const ex of filtered) {
       const cat = ex.category as ExerciseCategory;
       if (!map.has(cat)) map.set(cat, []);
       map.get(cat)!.push(ex);
     }
     return map;
-  }, [filtered]);
+  }, [filtered, categories]);
 
   const totalCount = filtered.length;
 
@@ -202,7 +215,7 @@ export function ExercisesView() {
     const payload = {
       name: form.name.trim(),
       category: form.category,
-      muscleGroup: form.muscleGroup.trim() || "Full body",
+      muscleGroup: form.muscleGroup.trim() || "Corps complet",
       isStatic: form.isStatic,
       description: form.description.trim() ? form.description.trim() : null,
       equipment: form.equipment.trim() ? form.equipment.trim() : null,
@@ -286,21 +299,31 @@ export function ExercisesView() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search exercises by name…"
+              placeholder="Rechercher un exercice par nom…"
               className="pl-9"
-              aria-label="Search exercises"
+              aria-label="Rechercher un exercice"
             />
           </div>
-          <Button onClick={openCreateExercise} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Exercise
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setCategoryDialogOpen(true)}
+              variant="outline"
+              className="gap-2"
+            >
+              <Palette className="h-4 w-4" />
+              Catégories
+            </Button>
+            <Button onClick={openCreateExercise} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Ajouter un exercice
+            </Button>
+          </div>
         </div>
 
         {/* Category filter chips */}
         <div className="flex flex-wrap items-center gap-2">
-          {CATEGORIES.map((cat) => {
-            const meta = CATEGORY_META[cat];
+          {categories.map((cat) => {
+            const meta = getCatMeta(cat);
             const active = activeCategories.has(cat);
             return (
               <button
@@ -332,7 +355,7 @@ export function ExercisesView() {
               className="h-8 text-xs text-muted-foreground"
               onClick={() => setActiveCategories(new Set())}
             >
-              Clear
+              Effacer
             </Button>
           )}
         </div>
@@ -343,37 +366,37 @@ export function ExercisesView() {
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <Dumbbell className="mb-3 h-8 w-8 animate-pulse" />
-            <p className="text-sm">Loading exercises…</p>
+            <p className="text-sm">Chargement…</p>
           </div>
         ) : totalCount === 0 ? (
           <EmptyState
             icon={Dumbbell}
-            title={search || activeCategories.size > 0 ? "No exercises match" : "No exercises yet"}
+            title={search || activeCategories.size > 0 ? "Aucun exercice ne correspond" : "Aucun exercice pour le moment"}
             description={
               search || activeCategories.size > 0
-                ? "Try adjusting your search or category filters."
-                : "Add your first exercise to start tracking your calisthenics progressions."
+                ? "Essaie d'ajuster ta recherche ou tes filtres de catégorie."
+                : "Ajoute ton premier exercice pour commencer à suivre tes progressions."
             }
             action={
               !search && activeCategories.size === 0 ? (
                 <Button onClick={openCreateExercise} className="gap-2">
                   <Plus className="h-4 w-4" />
-                  Add Exercise
+                  Ajouter un exercice
                 </Button>
               ) : undefined
             }
           />
         ) : (
           <div className="flex flex-col gap-8">
-            {CATEGORIES.map((cat) => {
+            {categories.map((cat) => {
               const items = grouped.get(cat) ?? [];
               if (items.length === 0) return null;
-              const meta = CATEGORY_META[cat];
+              const meta = getCatMeta(cat);
               return (
                 <section key={cat} className="flex flex-col">
                   <SectionHeading
                     title={`${meta.emoji}  ${meta.label}`}
-                    subtitle={`${items.length} exercise${items.length === 1 ? "" : "s"}`}
+                    subtitle={`${items.length} exercice${items.length === 1 ? "" : "s"}`}
                   />
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {items.map((ex) => (
@@ -397,11 +420,18 @@ export function ExercisesView() {
         )}
       </ScrollArea>
 
+      {/* Category manager dialog */}
+      <CategoryManagerDialog
+        open={categoryDialogOpen}
+        onOpenChange={setCategoryDialogOpen}
+      />
+
       {/* Exercise create/edit dialog */}
       <ExerciseFormDialog
         open={exerciseDialogOpen}
         onOpenChange={setExerciseDialogOpen}
         editing={editingExercise}
+        categories={categories}
         onSubmit={submitExercise}
         pending={createExercise.isPending || updateExercise.isPending}
       />
@@ -413,28 +443,28 @@ export function ExercisesView() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete exercise?</AlertDialogTitle>
+            <AlertDialogTitle>Supprimer l'exercice ?</AlertDialogTitle>
             <AlertDialogDescription>
               {deletingExercise && (
                 <>
-                  This will permanently delete{" "}
+                  Cette action supprimera définitivement{" "}
                   <span className="font-semibold text-foreground">
                     {deletingExercise.name}
                   </span>{" "}
-                  and all of its progression variants. Because exercises are referenced
-                  by workout entries, every past workout entry that uses this exercise
-                  will also be removed. This action cannot be undone.
+                  ainsi que toutes ses variantes. Les séances passées qui utilisent
+                  cet exercice seront également supprimées (effet cascade). Cette
+                  action est irréversible.
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-white hover:bg-destructive/90"
               onClick={confirmDeleteExercise}
             >
-              Delete
+              Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -456,28 +486,28 @@ export function ExercisesView() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete variant?</AlertDialogTitle>
+            <AlertDialogTitle>Supprimer la variante ?</AlertDialogTitle>
             <AlertDialogDescription>
               {deletingVariant && (
                 <>
-                  Remove the{" "}
+                  Retirer la progression{" "}
                   <span className="font-semibold text-foreground">
                     {deletingVariant.variant.name}
                   </span>{" "}
-                  progression? Past workout sets referencing this variant will have
-                  their variant cleared (set to null), but the workout entries
-                  themselves are kept.
+                  de l'arbre ? Les séries passées qui utilisent cette variante
+                  perdront leur référence (mise à null), mais les entrées de séance
+                  sont conservées.
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-white hover:bg-destructive/90"
               onClick={confirmDeleteVariant}
             >
-              Delete
+              Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -505,7 +535,8 @@ function ExerciseCard({
   onEditVariant: (v: ExerciseVariant) => void;
   onDeleteVariant: (v: ExerciseVariant) => void;
 }) {
-  const meta = CATEGORY_META[exercise.category as ExerciseCategory] ?? CATEGORY_META.Push;
+  const getCatMeta = useCategoryMeta();
+  const meta = getCatMeta(exercise.category as ExerciseCategory);
   const sortedVariants = React.useMemo(
     () =>
       [...exercise.variants].sort(
@@ -545,7 +576,7 @@ function ExerciseCard({
             {exercise.isStatic ? (
               <>
                 <Clock className="h-3 w-3" />
-                Hold
+                Maintien
               </>
             ) : (
               <>
@@ -571,13 +602,13 @@ function ExerciseCard({
             Progression
           </span>
           <span className="text-[11px] text-muted-foreground tabular-nums">
-            {sortedVariants.length} step{sortedVariants.length === 1 ? "" : "s"}
+            {sortedVariants.length} marche{sortedVariants.length === 1 ? "" : "s"}
           </span>
         </div>
 
         {sortedVariants.length === 0 ? (
           <div className="rounded-md border border-dashed border-border/60 bg-muted/20 px-3 py-2.5 text-center text-xs text-muted-foreground">
-            No variants yet. Add the first progression step.
+            Aucune variante pour le moment. Ajoute la première marche de progression.
           </div>
         ) : (
           <ol className="flex flex-col">
@@ -611,7 +642,7 @@ function ExerciseCard({
                       </span>
                       <span
                         className="shrink-0 text-[11px] tracking-tight text-amber-500"
-                        aria-label={`Difficulty ${v.difficultyLevel} of 5`}
+                        aria-label={`Difficulté ${v.difficultyLevel} sur 5`}
                       >
                         {difficultyStars(v.difficultyLevel)}
                       </span>
@@ -638,7 +669,7 @@ function ExerciseCard({
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-foreground"
                         onClick={() => onEditVariant(v)}
-                        aria-label="Edit variant"
+                        aria-label="Modifier la variante"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -647,7 +678,7 @@ function ExerciseCard({
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-destructive"
                         onClick={() => onDeleteVariant(v)}
-                        aria-label="Delete variant"
+                        aria-label="Supprimer la variante"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -664,7 +695,7 @@ function ExerciseCard({
       <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/20 px-4 py-2.5">
         <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
           <Star className="h-3.5 w-3.5 text-amber-500" />
-          {sortedVariants.length} variant{sortedVariants.length === 1 ? "" : "s"}
+          {sortedVariants.length} variante{sortedVariants.length === 1 ? "" : "s"}
         </span>
         <div className="flex items-center gap-1">
           <Button
@@ -674,7 +705,7 @@ function ExerciseCard({
             onClick={onAddVariant}
           >
             <Plus className="h-3.5 w-3.5" />
-            Add Variant
+            Ajouter une variante
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -682,7 +713,7 @@ function ExerciseCard({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                aria-label="Exercise actions"
+                aria-label="Actions de l'exercice"
               >
                 <MoreVertical className="h-4 w-4" />
               </Button>
@@ -690,7 +721,7 @@ function ExerciseCard({
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onEdit}>
                 <Pencil className="h-4 w-4" />
-                Edit
+                Modifier
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -698,7 +729,7 @@ function ExerciseCard({
                 onClick={onDelete}
               >
                 <Trash2 className="h-4 w-4" />
-                Delete
+                Supprimer
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -716,15 +747,18 @@ function ExerciseFormDialog({
   open,
   onOpenChange,
   editing,
+  categories,
   onSubmit,
   pending,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   editing: ExerciseWithVariants | null;
+  categories: ExerciseCategory[];
   onSubmit: (form: ExerciseFormState) => void;
   pending: boolean;
 }) {
+  const getCatMeta = useCategoryMeta();
   const [form, setForm] = React.useState<ExerciseFormState>(EMPTY_EXERCISE_FORM);
 
   React.useEffect(() => {
@@ -733,7 +767,7 @@ function ExerciseFormDialog({
       setForm({
         name: editing.name,
         category: (editing.category as ExerciseCategory) ?? "Push",
-        muscleGroup: editing.muscleGroup ?? "Full body",
+        muscleGroup: editing.muscleGroup ?? "Corps complet",
         isStatic: editing.isStatic,
         description: editing.description ?? "",
         equipment: editing.equipment ?? "",
@@ -759,23 +793,23 @@ function ExerciseFormDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {editing ? "Edit exercise" : "Add exercise"}
+            {editing ? "Modifier l'exercice" : "Ajouter un exercice"}
           </DialogTitle>
           <DialogDescription>
             {editing
-              ? "Update the exercise details and progression settings."
-              : "Create a new tracked exercise. You can add progression variants afterwards."}
+              ? "Mets à jour les détails de l'exercice et ses réglages de progression."
+              : "Crée un nouvel exercice suivi. Tu pourras ajouter des variantes ensuite."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="ex-name">Name</Label>
+            <Label htmlFor="ex-name">Nom</Label>
             <Input
               id="ex-name"
               value={form.name}
               onChange={(e) => update("name", e.target.value)}
-              placeholder="e.g. Planche, Pull-up, Pistol Squat"
+              placeholder="ex. Planche, Tractions, Pistol Squat"
               autoFocus
               required
             />
@@ -783,31 +817,34 @@ function ExerciseFormDialog({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <Label>Category</Label>
+              <Label>Catégorie</Label>
               <Select
                 value={form.category}
                 onValueChange={(v) => update("category", v as ExerciseCategory)}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Pick a category" />
+                  <SelectValue placeholder="Choisir une catégorie" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {CATEGORY_META[cat].emoji} {CATEGORY_META[cat].label}
-                    </SelectItem>
-                  ))}
+                  {categories.map((cat) => {
+                    const meta = getCatMeta(cat);
+                    return (
+                      <SelectItem key={cat} value={cat}>
+                        {meta.emoji} {meta.label}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="ex-muscle">Muscle group</Label>
+              <Label htmlFor="ex-muscle">Groupe musculaire</Label>
               <Input
                 id="ex-muscle"
                 value={form.muscleGroup}
                 onChange={(e) => update("muscleGroup", e.target.value)}
-                placeholder="e.g. Chest, Back, Full body"
+                placeholder="ex. Pectoraux, Dos, Corps complet"
               />
             </div>
           </div>
@@ -815,10 +852,10 @@ function ExerciseFormDialog({
           <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-muted/20 px-3 py-3">
             <div className="min-w-0">
               <Label htmlFor="ex-static" className="cursor-pointer">
-                Isometric hold
+                Maintien isométrique
               </Label>
               <p className="mt-1 text-xs text-muted-foreground">
-                Track seconds instead of reps.
+                Compter des secondes au lieu de reps.
               </p>
             </div>
             <Switch
@@ -829,22 +866,22 @@ function ExerciseFormDialog({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="ex-equipment">Equipment (optional)</Label>
+            <Label htmlFor="ex-equipment">Équipement (optionnel)</Label>
             <Input
               id="ex-equipment"
               value={form.equipment}
               onChange={(e) => update("equipment", e.target.value)}
-              placeholder="e.g. Paralettes, Rings, Wall"
+              placeholder="ex. Paralettes, Anneaux, Mur"
             />
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="ex-desc">Description (optional)</Label>
+            <Label htmlFor="ex-desc">Description (optionnelle)</Label>
             <Textarea
               id="ex-desc"
               value={form.description}
               onChange={(e) => update("description", e.target.value)}
-              placeholder="Brief notes about form, setup, or purpose."
+              placeholder="Notes brèves sur l'exécution, le setup ou l'objectif."
               rows={3}
             />
           </div>
@@ -855,10 +892,10 @@ function ExerciseFormDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              Annuler
             </Button>
             <Button type="submit" disabled={pending || !form.name.trim()}>
-              {pending ? "Saving…" : editing ? "Save changes" : "Create exercise"}
+              {pending ? "Enregistrement…" : editing ? "Enregistrer" : "Créer l'exercice"}
             </Button>
           </DialogFooter>
         </form>
@@ -922,23 +959,23 @@ function VariantFormDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {context?.variant ? "Edit variant" : "Add progression variant"}
+            {context?.variant ? "Modifier la variante" : "Ajouter une variante de progression"}
           </DialogTitle>
           <DialogDescription>
             {context?.variant
-              ? "Update this progression step in the exercise tree."
-              : "Add a new step to the progression (e.g. Tuck → Advanced Tuck → Full)."}
+              ? "Mets à jour cette marche de l'arbre de progression."
+              : "Ajoute une nouvelle marche à la progression (ex. Tuck → Advanced Tuck → Full)."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="var-name">Variant name</Label>
+            <Label htmlFor="var-name">Nom de la variante</Label>
             <Input
               id="var-name"
               value={form.name}
               onChange={(e) => update("name", e.target.value)}
-              placeholder="e.g. Tuck, Advanced Tuck, Straddle, Full"
+              placeholder="ex. Tuck, Advanced Tuck, Straddle, Full"
               autoFocus
               required
             />
@@ -947,9 +984,9 @@ function VariantFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="var-level">
-                Difficulty rank{" "}
+                Rang de difficulté{" "}
                 <span className="text-xs font-normal text-muted-foreground">
-                  (1 = easiest)
+                  (1 = le plus facile)
                 </span>
               </Label>
               <Input
@@ -966,7 +1003,7 @@ function VariantFormDialog({
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="var-target">
-                Target{" "}
+                Objectif{" "}
                 <span className="text-xs font-normal text-muted-foreground">
                   ({unit})
                 </span>
@@ -979,7 +1016,7 @@ function VariantFormDialog({
                 onChange={(e) =>
                   update("targetValue", Number(e.target.value) || 0)
                 }
-                placeholder="0 = none"
+                placeholder="0 = aucun"
                 className="tabular-nums"
               />
             </div>
@@ -988,7 +1025,7 @@ function VariantFormDialog({
           <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
             <Star className="h-3.5 w-3.5 shrink-0 text-amber-500" />
             <span className="tabular-nums">
-              Difficulty stars preview:{" "}
+              Aperçu des étoiles de difficulté :{" "}
               <span className="text-amber-500">
                 {difficultyStars(Math.min(Math.max(form.difficultyLevel, 0), 5))}
               </span>
@@ -996,12 +1033,12 @@ function VariantFormDialog({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="var-desc">Description (optional)</Label>
+            <Label htmlFor="var-desc">Description (optionnelle)</Label>
             <Textarea
               id="var-desc"
               value={form.description}
               onChange={(e) => update("description", e.target.value)}
-              placeholder="Form cues, prerequisites, or coaching notes."
+              placeholder="Indices d'exécution, prérequis ou notes de coaching."
               rows={2}
             />
           </div>
@@ -1012,14 +1049,14 @@ function VariantFormDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              Annuler
             </Button>
             <Button type="submit" disabled={pending || !form.name.trim()}>
               {pending
-                ? "Saving…"
+                ? "Enregistrement…"
                 : context?.variant
-                  ? "Save variant"
-                  : "Add variant"}
+                  ? "Enregistrer"
+                  : "Ajouter la variante"}
             </Button>
           </DialogFooter>
         </form>

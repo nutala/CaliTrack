@@ -8,29 +8,13 @@ import type {
   Workout as PrismaWorkout,
   WorkoutEntry as PrismaEntry,
   WorkoutSet as PrismaSet,
+  Category as PrismaCategory,
 } from "@prisma/client";
 
-export type ExerciseCategory =
-  | "Push"
-  | "Pull"
-  | "Legs"
-  | "Core"
-  | "Static"
-  | "Skill"
-  | "Mobility";
-
-export const CATEGORIES: ExerciseCategory[] = [
-  "Push",
-  "Pull",
-  "Legs",
-  "Core",
-  "Static",
-  "Skill",
-  "Mobility",
-];
+export type ExerciseCategory = string;
 
 export const CATEGORY_META: Record<
-  ExerciseCategory,
+  string,
   { label: string; color: string; emoji: string }
 > = {
   Push: { label: "Push", color: "#ef4444", emoji: "💪" },
@@ -41,6 +25,8 @@ export const CATEGORY_META: Record<
   Skill: { label: "Skill", color: "#ec4899", emoji: "🎯" },
   Mobility: { label: "Mobility", color: "#84cc16", emoji: "🤸" },
 };
+
+export type Category = PrismaCategory;
 
 export type Exercise = PrismaExercise;
 export type ExerciseVariant = PrismaVariant;
