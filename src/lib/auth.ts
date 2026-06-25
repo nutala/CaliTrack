@@ -72,8 +72,9 @@ export const authOptions: NextAuthOptions = {
       }
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
+        console.log("[auth] jwt callback", { provider: account?.provider, email: user.email, hasId: !!user.id });
         const email = user.email?.toLowerCase().trim();
         if (email) {
           try {
@@ -81,10 +82,13 @@ export const authOptions: NextAuthOptions = {
             if (dbUser) {
               token.uid = dbUser.id;
               token.image = dbUser.image ?? user.image;
-              token.email = dbUser.email;
+              console.log("[auth] jwt: found DB user", { uid: token.uid });
+            } else {
+              token.uid = user.id;
+              console.log("[auth] jwt: no DB user, using provider id", { uid: token.uid });
             }
-          } catch {
-            console.error("[auth] DB lookup failed in jwt callback, using provider id");
+          } catch (e) {
+            console.error("[auth] jwt DB lookup failed", e instanceof Error ? e.message : e);
             token.uid = user.id;
           }
         }
@@ -96,6 +100,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.uid as string;
         if (token.image) session.user.image = token.image as string;
+        console.log("[auth] session created", { uid: session.user.id });
       }
       return session;
     },
