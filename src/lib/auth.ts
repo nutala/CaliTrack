@@ -76,10 +76,15 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         const email = user.email?.toLowerCase().trim();
         if (email) {
-          const dbUser = await db.user.findUnique({ where: { email } });
-          if (dbUser) {
-            token.uid = dbUser.id;
-          } else {
+          try {
+            const dbUser = await db.user.findUnique({ where: { email } });
+            if (dbUser) {
+              token.uid = dbUser.id;
+              token.image = dbUser.image ?? user.image;
+              token.email = dbUser.email;
+            }
+          } catch {
+            console.error("[auth] DB lookup failed in jwt callback, using provider id");
             token.uid = user.id;
           }
         }
