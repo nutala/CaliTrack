@@ -163,7 +163,7 @@ export function LoginDialog({
           </div>
           <DialogTitle className="text-center">Se connecter</DialogTitle>
           <DialogDescription className="text-center">
-            Choisissez un compte pour continuer sur CalisTrack.
+            Choisissez un compte pour continuer sur CaliTrack.
           </DialogDescription>
         </DialogHeader>
 

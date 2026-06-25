@@ -55,6 +55,24 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === "google") {
+        if (!user.email) return false;
+        const email = user.email.toLowerCase().trim();
+        const name = user.name || email.split("@")[0];
+        const image =
+          user.image ||
+          `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=4f46e5`;
+
+        let dbUser = await db.user.findUnique({ where: { email } });
+        if (!dbUser) {
+          dbUser = await db.user.create({ data: { email, name, image } });
+        }
+        user.id = dbUser.id;
+        await ensureDefaultCategories(dbUser.id);
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.uid = user.id;

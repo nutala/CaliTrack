@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex flex-col items-start leading-none">
               <span className="text-base font-bold tracking-tight">
-                CalisTrack
+                CaliTrack
               </span>
               <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                 Calisthénie
@@ -130,7 +130,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col items-center justify-between gap-2 text-xs text-muted-foreground sm:flex-row">
             <p className="flex items-center gap-1.5">
               <Activity className="h-3.5 w-3.5" />
-              <span className="font-medium">CalisTrack</span>
+              <span className="font-medium">CaliTrack</span>
               <span className="opacity-60">·</span>
               <span>Suivi de performance calisthénie</span>
             </p>
