@@ -135,7 +135,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span>Suivi de performance calisthénie</span>
             </p>
             <p className="opacity-70">
-              Conçu pour les athlètes qui visent la full planche. 💪
+              Chaque répétition compte.
             </p>
           </div>
         </div>
