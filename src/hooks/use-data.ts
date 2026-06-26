@@ -241,7 +241,6 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: (body: {
       name?: string;
-      image?: string;
       newPassword?: string;
     }) => api.patch<{ name: string; email: string; image: string | null }>(
       "/api/user/profile",
@@ -250,6 +249,27 @@ export function useUpdateProfile() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["session"] });
       toast.success("Profil mis à jour");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useUploadAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append("avatar", file);
+      const res = await fetch("/api/user/avatar", { method: "POST", body: fd });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Échec de l'upload");
+      }
+      return res.json() as Promise<{ image: string }>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["session"] });
+      toast.success("Photo de profil mise à jour");
     },
     onError: (e: Error) => toast.error(e.message),
   });

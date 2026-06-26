@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { useSession } from "next-auth/react";
-import { Loader2, Save, User } from "lucide-react";
-import { useUpdateProfile } from "@/hooks/use-data";
+import { Camera, Loader2, Save, User } from "lucide-react";
+import { useUpdateProfile, useUploadAvatar } from "@/hooks/use-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,18 +12,20 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function ProfileView() {
   const { data: session, update } = useSession();
-  const mutation = useUpdateProfile();
+  const profileMutation = useUpdateProfile();
+  const avatarMutation = useUploadAvatar();
   const user = session?.user;
 
+  const fileRef = React.useRef<HTMLInputElement>(null);
   const [name, setName] = React.useState("");
-  const [image, setImage] = React.useState("");
+  const [preview, setPreview] = React.useState("");
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
 
   React.useEffect(() => {
     if (user) {
       setName(user.name ?? "");
-      setImage(user.image ?? "");
+      setPreview(user.image ?? "");
     }
   }, [user]);
 
@@ -43,19 +45,36 @@ export function ProfileView() {
     .join("")
     .toUpperCase();
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (newPassword && newPassword !== confirmPassword) {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
       return;
     }
-    const body: { name?: string; image?: string; newPassword?: string } = {};
-    if (name !== (user.name ?? "")) body.name = name;
-    if (image !== (user.image ?? "")) body.image = image;
-    if (newPassword) body.newPassword = newPassword;
+    if (file.size > 2 * 1024 * 1024) {
+      return;
+    }
 
+    const localUrl = URL.createObjectURL(file);
+    setPreview(localUrl);
+    fileRef.current!.value = "";
+
+    await avatarMutation.mutateAsync(file);
+    update();
+    URL.revokeObjectURL(localUrl);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword && newPassword !== confirmPassword) return;
+
+    const body: { name?: string; newPassword?: string } = {};
+    if (name !== (user.name ?? "")) body.name = name;
+    if (newPassword) body.newPassword = newPassword;
     if (Object.keys(body).length === 0) return;
 
-    await mutation.mutateAsync(body);
+    await profileMutation.mutateAsync(body);
     update();
     setNewPassword("");
     setConfirmPassword("");
@@ -79,14 +98,41 @@ export function ProfileView() {
         <CardHeader>
           <CardTitle className="text-base">Photo de profil</CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center gap-4">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={image || undefined} alt={name} />
-            <AvatarFallback className="text-lg">{initials}</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground">{name || "Utilisateur"}</p>
-            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+        <CardContent>
+          <div className="flex items-center gap-6">
+            <div className="relative">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={avatarMutation.isPending ? undefined : preview} alt={name} />
+                <AvatarFallback className="text-xl">{initials}</AvatarFallback>
+              </Avatar>
+              {avatarMutation.isPending && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-background/60">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">{name || "Utilisateur"}</p>
+              <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 gap-2"
+                disabled={avatarMutation.isPending}
+                onClick={() => fileRef.current?.click()}
+              >
+                <Camera className="h-4 w-4" />
+                {avatarMutation.isPending ? "Upload..." : "Changer la photo"}
+              </Button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -104,17 +150,6 @@ export function ProfileView() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ton nom"
-              />
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label htmlFor="profile-image">URL de la photo de profil</Label>
-              <Input
-                id="profile-image"
-                type="url"
-                value={image}
-                onChange={(e) => setImage(e.target.value)}
-                placeholder="https://example.com/avatar.jpg"
               />
             </div>
 
@@ -155,10 +190,10 @@ export function ProfileView() {
             <div className="flex justify-end pt-2">
               <Button
                 type="submit"
-                disabled={mutation.isPending}
+                disabled={profileMutation.isPending}
                 className="gap-2"
               >
-                {mutation.isPending ? (
+                {profileMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Save className="h-4 w-4" />
