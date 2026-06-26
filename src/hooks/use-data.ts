@@ -235,6 +235,26 @@ export function useProgress(exerciseId?: string, variantId?: string | null) {
   });
 }
 
+/** ----- Profile ----- */
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      name?: string;
+      image?: string;
+      newPassword?: string;
+    }) => api.patch<{ name: string; email: string; image: string | null }>(
+      "/api/user/profile",
+      body,
+    ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["session"] });
+      toast.success("Profil mis à jour");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 /** ----- Categories ----- */
 export function useCategories() {
   return useQuery<Category[]>({

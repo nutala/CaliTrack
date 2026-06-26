@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { signOut, useSession } from "next-auth/react";
-import { LogOut } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LoginDialog } from "@/components/app/login-dialog";
+import { useAppStore } from "@/lib/store";
 
 /** Build a 1-2 character initials string from a display name or email. */
 function getInitials(name?: string | null, email?: string | null): string {
@@ -94,6 +95,14 @@ export function UserMenu() {
               {user.email}
             </span>
           </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => useAppStore.getState().setView("profile")}
+            className="gap-2"
+          >
+            <User className="h-4 w-4" />
+            Mon Profil
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => signOut({ callbackUrl: "/" })}

@@ -12,7 +12,8 @@ export type ViewId =
   | "exercises"
   | "new-workout"
   | "history"
-  | "stats";
+  | "stats"
+  | "profile";
 
 interface AppState {
   view: ViewId;

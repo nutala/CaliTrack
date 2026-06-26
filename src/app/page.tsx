@@ -8,6 +8,7 @@ import { ExercisesView } from "@/components/app/views/exercises-view";
 import { NewWorkoutView } from "@/components/app/views/new-workout-view";
 import { HistoryView } from "@/components/app/views/history-view";
 import { StatsView } from "@/components/app/views/stats-view";
+import { ProfileView } from "@/components/app/views/profile-view";
 
 export default function Home() {
   const view = useAppStore((s) => s.view);
@@ -39,6 +40,8 @@ function ViewRouter({ view }: { view: ReturnType<typeof useAppStore.getState>["v
       return <HistoryView />;
     case "stats":
       return <StatsView />;
+    case "profile":
+      return <ProfileView />;
     default:
       return <DashboardView />;
   }
