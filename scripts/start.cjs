@@ -1,6 +1,8 @@
 const { execSync } = require('child_process');
 
-require('./patch-openid-client.cjs');
+// Patch is applied at build time (scripts/build.js), runtime patch is a safety net
+const patchProcessResponse = require('./patch-openid-client.cjs');
+patchProcessResponse();
 
 const port = process.env.PORT || 3000;
 

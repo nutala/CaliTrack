@@ -1,21 +1,22 @@
 const fs = require('fs');
 const path = require('path');
 
-const targetFile = path.join(process.cwd(), 'node_modules', 'openid-client', 'lib', 'helpers', 'process_response.js');
+function patchProcessResponse() {
+  const targetFile = path.join(process.cwd(), 'node_modules', 'openid-client', 'lib', 'helpers', 'process_response.js');
 
-if (!fs.existsSync(targetFile)) {
-  console.log('[patch] openid-client process_response.js not found, skipping');
-  process.exit(0);
-}
+  if (!fs.existsSync(targetFile)) {
+    console.log('[patch] openid-client process_response.js not found, skipping');
+    return false;
+  }
 
-let content = fs.readFileSync(targetFile, 'utf8');
+  let content = fs.readFileSync(targetFile, 'utf8');
 
-if (content.includes('[openid-client] Non-200 response from token endpoint')) {
-  console.log('[patch] openid-client process_response.js already patched');
-  process.exit(0);
-}
+  if (content.includes('[openid-client] Non-200 response from token endpoint')) {
+    console.log('[patch] openid-client process_response.js already patched');
+    return true;
+  }
 
-const patchInsertion = `
+  const patchInsertion = `
     let debugBody = '(unable to read)';
     try {
       if (response.body) {
@@ -34,23 +35,31 @@ const patchInsertion = `
     console.error('[openid-client] Response headers:', JSON.stringify(response.headers));
 `;
 
-const searchStr = `throw new OPError(
+  const searchStr = `throw new OPError(
       {
         error: format(
           'expected %i %s, got: %i %s',`;
 
-const replacement = patchInsertion + `
+  const replacement = patchInsertion + `
     throw new OPError(
       {
         error: format(
           'expected %i %s, got: %i %s',`;
 
-if (!content.includes(searchStr)) {
-  console.log('[patch] Could not find insertion point in process_response.js');
-  console.log('[patch] File content preview:', content.substring(0, 500));
-  process.exit(0);
+  if (!content.includes(searchStr)) {
+    console.log('[patch] Could not find insertion point in process_response.js');
+    console.log('[patch] File content preview:', content.substring(0, 500));
+    return false;
+  }
+
+  content = content.replace(searchStr, replacement);
+  fs.writeFileSync(targetFile, content, 'utf8');
+  console.log('[patch] Successfully patched openid-client process_response.js with debug logging');
+  return true;
 }
 
-content = content.replace(searchStr, replacement);
-fs.writeFileSync(targetFile, content, 'utf8');
-console.log('[patch] Successfully patched openid-client process_response.js with debug logging');
+module.exports = patchProcessResponse;
+
+if (require.main === module) {
+  patchProcessResponse();
+}

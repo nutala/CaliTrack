@@ -1,6 +1,10 @@
 const { execSync } = require("child_process");
 const path = require("path");
 
+// Patch openid-client source BEFORE Next.js bundles it
+const patchProcessResponse = require("./patch-openid-client.cjs");
+patchProcessResponse();
+
 const SEP = "=".repeat(60);
 
 function run(cmd) {
