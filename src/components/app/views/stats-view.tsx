@@ -262,11 +262,9 @@ export function StatsView() {
                 description="Enregistre des séances dans les 30 derniers jours pour remplir ce graphique."
               />
             ) : (
-              <div className="overflow-x-auto">
-                <div className="min-w-[360px]">
               <ChartContainer
                 config={volumeChartConfig}
-                className="h-[260px] w-full block"
+                className="h-[260px] w-full"
               >
                 <BarChart
                   data={volumeByCat}
@@ -310,8 +308,6 @@ export function StatsView() {
                   </Bar>
                 </BarChart>
               </ChartContainer>
-                </div>
-              </div>
             )}
           </CardContent>
         </Card>
@@ -407,11 +403,9 @@ export function StatsView() {
             ) : frequencyData.length === 0 ? (
               <EmptyState title="Pas de données" />
             ) : (
-              <div className="overflow-x-auto">
-                <div className="min-w-[480px]">
               <ChartContainer
                 config={frequencyChartConfig}
-                className="h-[260px] w-full block"
+                className="h-[260px] w-full"
               >
                 <BarChart
                   data={frequencyData}
@@ -463,8 +457,6 @@ export function StatsView() {
                   />
                 </BarChart>
               </ChartContainer>
-                </div>
-              </div>
             )}
           </CardContent>
         </Card>
@@ -627,11 +619,9 @@ export function StatsView() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <div className="min-w-[400px]">
               <ChartContainer
                 config={trendChartConfig}
-                className="h-[240px] w-full block"
+                className="h-[240px] w-full"
               >
                 <LineChart
                   data={trendData}
@@ -683,8 +673,6 @@ export function StatsView() {
                   />
                 </LineChart>
               </ChartContainer>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </div>
