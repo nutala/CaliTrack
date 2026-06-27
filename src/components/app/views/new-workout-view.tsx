@@ -476,7 +476,7 @@ export function NewWorkoutView() {
                 canJoinPrevSuperset={prevEntry?.supersetGroup != null}
                 onChange={(patch) => draft.updateEntry(entry.id, patch)}
                 onRemove={() => draft.removeEntry(entry.id)}
-                onAddSet={() => draft.addSet(entry.id)}
+                onAddSet={(defaults) => draft.addSet(entry.id, defaults)}
                 onUpdateSet={(setId, patch) =>
                   draft.updateSet(entry.id, setId, patch)
                 }
@@ -660,7 +660,7 @@ function EntryCard({
   nextGroup: number;
   onChange: (patch: Partial<DraftEntry>) => void;
   onRemove: () => void;
-  onAddSet: () => void;
+  onAddSet: (defaults?: Partial<DraftSet>) => void;
   onUpdateSet: (setId: string, patch: Partial<DraftSet>) => void;
   onRemoveSet: (setId: string) => void;
   onValidateSet: (setId: string, validated: boolean) => void;
@@ -686,6 +686,14 @@ function EntryCard({
   const ssColor = supersetColor(supersetGroup);
   const ssLabel = supersetLabel(supersetGroup);
   const inSuperset = supersetGroup != null;
+
+  function handleAddSet() {
+    const lastSet = sets[sets.length - 1];
+    const defaults: Partial<DraftSet> = {};
+    if (entry.variantId) defaults.variantId = entry.variantId;
+    if (lastSet?.mode) defaults.mode = lastSet.mode;
+    onAddSet(defaults);
+  }
 
   return (
     <Card
@@ -853,7 +861,7 @@ function EntryCard({
             <thead>
               <tr className="text-xs uppercase text-muted-foreground">
                 <th className="w-10 pb-2 text-left font-medium">Série</th>
-                <th className="pb-2 text-left font-medium">{metricLabel}</th>
+                <th className="pb-2 text-left font-medium">Valeur</th>
                 {sortedVariants.length > 0 && (
                   <th className="w-20 pb-2 text-left font-medium">Var.</th>
                 )}
@@ -916,7 +924,7 @@ function EntryCard({
           )}
         </div>
 
-        <Button variant="outline" size="sm" onClick={onAddSet}>
+        <Button variant="outline" size="sm" onClick={handleAddSet}>
           <Plus className="h-4 w-4" />
           Ajouter une série
         </Button>
@@ -1088,24 +1096,25 @@ function SetRowDesktop({
     >
       <td className="py-2 text-muted-foreground tabular-nums">{idx + 1}</td>
       <td className="py-2 pr-2">
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-1">
           <NumberInput
             value={mode === "reps" ? set.reps : set.holdSeconds}
             placeholder={mode === "hold" ? "30" : "8"}
-            aria-label={`${metricLabel} pour la série ${idx + 1}`}
+            aria-label={`${mode === "hold" ? "Maintien" : "Reps"} pour la série ${idx + 1}`}
             onChange={(n) =>
               onUpdate(mode === "reps" ? { reps: n } : { holdSeconds: n })
             }
           />
-          <button
+          <Button
             type="button"
+            size="sm"
+            variant="ghost"
+            className="h-9 px-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
             onClick={() => onUpdate({ mode: otherMode })}
-            className="flex h-9 w-5 items-center justify-center rounded-md border border-border/60 text-[10px] tabular-nums text-muted-foreground hover:bg-muted"
-            aria-label={`Passer en mode ${otherMode === "reps" ? "répétitions" : "maintien"}`}
-            title={mode === "reps" ? "Maintien" : "Reps"}
+            aria-label={`Passer en ${otherMode === "reps" ? "répétitions" : "maintien"}`}
           >
-            {mode === "reps" ? "⌛" : "↺"}
-          </button>
+            {mode === "reps" ? "Maintien" : "Reps"}
+          </Button>
         </div>
       </td>
       <td className="py-2 pr-2">

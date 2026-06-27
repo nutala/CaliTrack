@@ -91,7 +91,7 @@ interface WorkoutDraftStore extends WorkoutDraft {
   updateEntry: (entryId: string, patch: Partial<DraftEntry>) => void;
   setSuperset: (entryId: string, group: number | null) => void;
 
-  addSet: (entryId: string) => void;
+  addSet: (entryId: string, defaults?: Partial<DraftSet>) => void;
   updateSet: (entryId: string, setId: string, patch: Partial<DraftSet>) => void;
   removeSet: (entryId: string, setId: string) => void;
   validateSet: (entryId: string, setId: string, validated: boolean) => void;
@@ -155,11 +155,17 @@ export const useDraftStore = create<WorkoutDraftStore>()(
       ),
     })),
 
-  addSet: (entryId) =>
+  addSet: (entryId, defaults) =>
     set((s) => ({
       entries: s.entries.map((e) =>
         e.id === entryId
-          ? { ...e, sets: [...e.sets, { id: uid(), validated: false }] }
+          ? {
+              ...e,
+              sets: [
+                ...e.sets,
+                { id: uid(), validated: false, ...defaults },
+              ],
+            }
           : e,
       ),
     })),
