@@ -189,7 +189,7 @@ export function RestTimerWidget() {
                   onClick={timer.dismiss}
                 >
                   <X className="h-3.5 w-3.5" />
-                  Dismiss
+                  OK
                 </Button>
               ) : (
                 <>
@@ -199,7 +199,7 @@ export function RestTimerWidget() {
                       variant="outline"
                       className="h-8 w-8"
                       onClick={timer.pause}
-                      aria-label="Pause rest timer"
+                      aria-label="Mettre le minuteur en pause"
                     >
                       <Pause className="h-4 w-4" />
                     </Button>
@@ -209,7 +209,7 @@ export function RestTimerWidget() {
                       variant="outline"
                       className="h-8 w-8"
                       onClick={timer.resume}
-                      aria-label="Resume rest timer"
+                      aria-label="Reprendre le minuteur"
                     >
                       <Play className="h-4 w-4" />
                     </Button>
@@ -219,7 +219,7 @@ export function RestTimerWidget() {
                     variant="outline"
                     className="h-8 w-8"
                     onClick={() => timer.addTime(-15)}
-                    aria-label="Subtract 15 seconds"
+                    aria-label="Enlever 15 secondes"
                     title="-15s"
                   >
                     <Minus className="h-4 w-4" />
@@ -229,7 +229,7 @@ export function RestTimerWidget() {
                     variant="outline"
                     className="h-8 w-8"
                     onClick={() => timer.addTime(15)}
-                    aria-label="Add 15 seconds"
+                    aria-label="Ajouter 15 secondes"
                     title="+15s"
                   >
                     <Plus className="h-4 w-4" />
@@ -239,8 +239,8 @@ export function RestTimerWidget() {
                     variant="outline"
                     className="h-8 w-8"
                     onClick={timer.skip}
-                    aria-label="Skip rest"
-                    title="Skip"
+                    aria-label="Passer le repos"
+                    title="Passer"
                   >
                     <SkipForward className="h-4 w-4" />
                   </Button>
