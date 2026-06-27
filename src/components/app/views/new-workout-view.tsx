@@ -26,7 +26,7 @@ import {
   type ExerciseWithVariants,
   type ExerciseCategory,
 } from "@/lib/types";
-import { metricUnit, fmtCompact, supersetLabel, supersetColor } from "@/lib/calc";
+import { metricUnit, fmtCompact, supersetLabel, supersetColor, difficultyStars } from "@/lib/calc";
 import {
   useExercises,
   useCreateWorkout,
@@ -775,7 +775,7 @@ function EntryCard({
                   <SelectItem key={v.id} value={v.id}>
                     {v.name}
                     <span className="ml-1 text-xs text-muted-foreground">
-                      · Niv {v.difficultyLevel}
+                      {difficultyStars(v.difficultyLevel)}
                     </span>
                   </SelectItem>
                 ))}
@@ -1179,7 +1179,7 @@ function SetRowDesktop({
             <option value="__entry__">Défaut</option>
             {variants.map((v) => (
               <option key={v.id} value={v.id}>
-                {v.name}
+                {v.name} {difficultyStars(v.difficultyLevel)}
               </option>
             ))}
           </select>
@@ -1379,7 +1379,7 @@ function SetRowMobile({
             <option value="__entry__">Défaut</option>
             {variants.map((v) => (
               <option key={v.id} value={v.id}>
-                {v.name} · Niv {v.difficultyLevel}
+                {v.name} {difficultyStars(v.difficultyLevel)}
               </option>
             ))}
           </select>
