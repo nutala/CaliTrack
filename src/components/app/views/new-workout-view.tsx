@@ -38,6 +38,7 @@ import { useAppStore } from "@/lib/store";
 import {
   useDraftStore,
   nextSupersetGroup,
+  usedSupersetGroups,
   type DraftEntry,
   type DraftSet,
 } from "@/lib/draft-store";
@@ -83,18 +84,42 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Play a short pleasant "ding" when a set is validated. */
+function playSetSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.05);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.15);
+  } catch {
+    // Audio not available — fail silently.
+  }
+}
+
 /** Adapter so `setMetric` (which expects the Prisma nullable shape) can read a DraftSet. */
-function draftMetric(set: DraftSet): number {
-  return (
-    set.reps ??
-    set.holdSeconds ??
-    0
-  );
+function draftMetric(set: DraftSet, defaultMode?: "reps" | "hold"): number {
+  const mode = set.mode ?? defaultMode ?? "reps";
+  return mode === "reps" ? (set.reps ?? 0) : (set.holdSeconds ?? 0);
 }
 
 /** Badge classes for perceived exertion (low → mid → high). */
@@ -157,6 +182,7 @@ export function NewWorkoutView() {
   }, [repeatId, workoutsQ.data]);
 
   const { title, date, durationMin, exertion, bodyweight, notes, defaultRestSec, entries, sessionStartedAt } = draft;
+  const existingGroups = React.useMemo(() => usedSupersetGroups(entries), [entries]);
 
   function addEntry(exercise: ExerciseWithVariants) {
     draft.addEntry(exercise);
@@ -166,7 +192,11 @@ export function NewWorkoutView() {
   // ----- derived totals for the sticky bar -----
   const totalSets = entries.reduce((acc, e) => acc + e.sets.length, 0);
   const totalVolume = entries.reduce(
-    (acc, e) => acc + e.sets.reduce((a, s) => a + draftMetric(s), 0),
+    (acc, e) => {
+      const ex = exerciseMap.get(e.exerciseId);
+      const defMode = ex?.isStatic ? "hold" : "reps";
+      return acc + e.sets.reduce((a, s) => a + draftMetric(s, defMode), 0);
+    },
     0,
   );
   const validatedSets = entries.reduce(
@@ -192,9 +222,10 @@ export function NewWorkoutView() {
         return;
       }
       for (const set of entry.sets) {
-        const metric = ex.isStatic ? set.holdSeconds : set.reps;
+        const mode = set.mode ?? (ex.isStatic ? "hold" : "reps");
+        const metric = mode === "reps" ? set.reps : set.holdSeconds;
         if (metric == null || Number.isNaN(metric)) {
-          const label = ex.isStatic ? "maintien (s)" : "reps";
+          const label = mode === "hold" ? "maintien (s)" : "reps";
           toast.error(
             `Chaque série de « ${ex.name} » doit avoir une valeur de ${label}.`,
           );
@@ -214,21 +245,25 @@ export function NewWorkoutView() {
           ? durationMin
           : undefined,
       perceivedExertion: exertion,
-      bodyweightKg: bodyweight,
+      bodyweightKg: bodyweight === "" ? undefined : bodyweight,
       notes: notes.trim() || undefined,
       entries: entries.map((e) => {
-        const ex = exerciseMap.get(e.exerciseId)!;
         return {
           exerciseId: e.exerciseId,
           variantId: e.variantId,
           supersetGroup: e.supersetGroup,
           notes: e.notes.trim() || undefined,
-          sets: e.sets.map((s) => ({
-            reps: ex.isStatic ? undefined : s.reps,
-            holdSeconds: ex.isStatic ? s.holdSeconds : undefined,
-            weightKg: s.weightKg,
-            rpe: s.rpe,
-          })),
+          sets: e.sets.map((s) => {
+            const mode = s.mode ?? (
+              exerciseMap.get(e.exerciseId)?.isStatic ? "hold" : "reps"
+            );
+            return {
+              reps: mode === "reps" ? s.reps : undefined,
+              holdSeconds: mode === "hold" ? s.holdSeconds : undefined,
+              weightKg: s.weightKg,
+              rpe: s.rpe,
+            };
+          }),
         };
       }),
     };
@@ -311,11 +346,12 @@ export function NewWorkoutView() {
                 type="number"
                 inputMode="decimal"
                 step={0.1}
+                placeholder="72"
                 value={bodyweight}
                 onChange={(e) =>
                   draft.setMeta(
                     "bodyweight",
-                    e.target.value === "" ? 0 : Number(e.target.value),
+                    e.target.value === "" ? "" : Number(e.target.value),
                   )
                 }
                 className="tabular-nums"
@@ -448,25 +484,25 @@ export function NewWorkoutView() {
                 onValidateSet={(setId, v) =>
                   draft.validateSet(entry.id, setId, v)
                 }
-                onToggleSuperset={() => {
-                  if (entry.supersetGroup != null) {
-                    // Already in a superset → leave it.
-                    draft.setSuperset(entry.id, null);
-                    return;
-                  }
-                  // Turning on: join the previous entry's superset if it has
-                  // one (natural flow for back-to-back exercises), else start
-                  // a new group.
-                  const prevGroup = prevEntry?.supersetGroup;
-                  if (prevGroup != null) {
-                    draft.setSuperset(entry.id, prevGroup);
-                  } else {
-                    draft.setSuperset(entry.id, nextSupersetGroup(entries));
-                  }
-                }}
+                allGroups={existingGroups}
+                nextGroup={nextSupersetGroup(entries)}
+                onSelectSuperset={(group) =>
+                  draft.setSuperset(entry.id, group)
+                }
               />
             );
           })}
+          {/* Bottom "add exercise" button */}
+          <div className="flex justify-center pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setPickerOpen(true)}
+              className="gap-2"
+            >
+              <PlusCircle className="h-4 w-4" />
+              Ajouter un exercice
+            </Button>
+          </div>
         </div>
       )}
 
@@ -604,13 +640,15 @@ function EntryCard({
   supersetCount,
   isFirstOfSuperset,
   canJoinPrevSuperset,
+  allGroups,
+  nextGroup,
   onChange,
   onRemove,
   onAddSet,
   onUpdateSet,
   onRemoveSet,
   onValidateSet,
-  onToggleSuperset,
+  onSelectSuperset,
 }: {
   entry: DraftEntry;
   exercise: ExerciseWithVariants;
@@ -618,13 +656,15 @@ function EntryCard({
   supersetCount: number;
   isFirstOfSuperset: boolean;
   canJoinPrevSuperset: boolean;
+  allGroups: number[];
+  nextGroup: number;
   onChange: (patch: Partial<DraftEntry>) => void;
   onRemove: () => void;
   onAddSet: () => void;
   onUpdateSet: (setId: string, patch: Partial<DraftSet>) => void;
   onRemoveSet: (setId: string) => void;
   onValidateSet: (setId: string, validated: boolean) => void;
-  onToggleSuperset: () => void;
+  onSelectSuperset: (group: number | null) => void;
 }) {
   const { variantId, notes, sets, supersetGroup } = entry;
   const getCatMeta = useCategoryMeta();
@@ -634,8 +674,9 @@ function EntryCard({
   const metricLabel = isStatic ? "Maintien (s)" : "Reps";
 
   const totalSetsCount = sets.length;
-  const totalVolume = sets.reduce((a, s) => a + draftMetric(s), 0);
-  const bestSet = sets.reduce((m, s) => Math.max(m, draftMetric(s)), 0);
+  const defMode = isStatic ? "hold" : "reps";
+  const totalVolume = sets.reduce((a, s) => a + draftMetric(s, defMode), 0);
+  const bestSet = sets.reduce((m, s) => Math.max(m, draftMetric(s, defMode)), 0);
   const validatedCount = sets.filter((s) => s.validated).length;
 
   const sortedVariants = exercise.variants
@@ -716,37 +757,64 @@ function EntryCard({
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              size="icon"
-              variant="ghost"
-              className={cn(
-                "h-8 w-8",
-                inSuperset
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-primary",
-              )}
-              onClick={onToggleSuperset}
-              aria-label={
-                inSuperset
-                  ? "Retirer du superset"
-                  : canJoinPrevSuperset
-                    ? "Rejoindre le superset précédent"
-                    : "Démarrer un nouveau superset ici"
-              }
-              title={
-                inSuperset
-                  ? "Retirer du superset"
-                  : canJoinPrevSuperset
-                    ? "Rejoindre le superset de l'exercice précédent"
-                    : "Démarrer un nouveau superset"
-              }
-            >
-              {inSuperset ? (
-                <Link2Off className="h-4 w-4" />
-              ) : (
-                <Link2 className="h-4 w-4" />
-              )}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={cn(
+                    "h-8 w-8",
+                    inSuperset
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-primary",
+                  )}
+                  aria-label="Options de superset"
+                >
+                  {inSuperset ? (
+                    <Link2Off className="h-4 w-4" />
+                  ) : (
+                    <Link2 className="h-4 w-4" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {inSuperset && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => onSelectSuperset(null)}
+                      className="gap-2 text-destructive focus:text-destructive"
+                    >
+                      <Link2Off className="h-4 w-4" />
+                      Retirer du superset{" "}
+                      {supersetLabel(supersetGroup)}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                {allGroups
+                  .filter((g) => g !== supersetGroup)
+                  .map((g) => (
+                    <DropdownMenuItem
+                      key={g}
+                      onClick={() => onSelectSuperset(g)}
+                      className="gap-2"
+                    >
+                      <span
+                        className="h-3 w-3 rounded-full"
+                        style={{ backgroundColor: supersetColor(g) }}
+                      />
+                      Superset {supersetLabel(g)}
+                    </DropdownMenuItem>
+                  ))}
+                <DropdownMenuItem
+                  onClick={() => onSelectSuperset(nextGroup)}
+                  className="gap-2"
+                >
+                  <Link2 className="h-4 w-4" />
+                  Nouveau superset
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               size="icon"
               variant="ghost"
@@ -786,6 +854,9 @@ function EntryCard({
               <tr className="text-xs uppercase text-muted-foreground">
                 <th className="w-10 pb-2 text-left font-medium">Série</th>
                 <th className="pb-2 text-left font-medium">{metricLabel}</th>
+                {sortedVariants.length > 0 && (
+                  <th className="w-20 pb-2 text-left font-medium">Var.</th>
+                )}
                 <th className="pb-2 text-left font-medium">Poids (kg)</th>
                 <th className="pb-2 text-left font-medium">RPE</th>
                 <th className="w-20 pb-2 text-center font-medium">Fait</th>
@@ -802,6 +873,7 @@ function EntryCard({
                   isStatic={isStatic}
                   metricLabel={metricLabel}
                   defaultRestSec={defaultRestSec}
+                  variants={sortedVariants}
                   onUpdate={(patch) => onUpdateSet(set.id, patch)}
                   onRemove={() => onRemoveSet(set.id)}
                   onValidate={(v) => onValidateSet(set.id, v)}
@@ -810,7 +882,7 @@ function EntryCard({
               {sets.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={sortedVariants.length > 0 ? 8 : 7}
                     className="py-3 text-center text-xs text-muted-foreground"
                   >
                     Aucune série pour le moment — ajoute-en une ci-dessous.
@@ -831,6 +903,7 @@ function EntryCard({
               isStatic={isStatic}
               metricLabel={metricLabel}
               defaultRestSec={defaultRestSec}
+              variants={sortedVariants}
               onUpdate={(patch) => onUpdateSet(set.id, patch)}
               onRemove={() => onRemoveSet(set.id)}
               onValidate={(v) => onValidateSet(set.id, v)}
@@ -899,7 +972,10 @@ function ValidateButton({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        if (!validated) playSetSound();
+        onClick();
+      }}
       aria-label={label}
       aria-pressed={validated}
       className={cn(
@@ -985,6 +1061,7 @@ function SetRowDesktop({
   isStatic,
   metricLabel,
   defaultRestSec,
+  variants,
   onUpdate,
   onRemove,
   onValidate,
@@ -994,11 +1071,14 @@ function SetRowDesktop({
   isStatic: boolean;
   metricLabel: string;
   defaultRestSec: number;
+  variants: { id: string; name: string; difficultyLevel: number }[];
   onUpdate: (patch: Partial<DraftSet>) => void;
   onRemove: () => void;
   onValidate: (validated: boolean) => void;
 }) {
   const validated = set.validated;
+  const mode = set.mode ?? (isStatic ? "hold" : "reps");
+  const otherMode = mode === "reps" ? "hold" : "reps";
   return (
     <tr
       className={cn(
@@ -1008,23 +1088,66 @@ function SetRowDesktop({
     >
       <td className="py-2 text-muted-foreground tabular-nums">{idx + 1}</td>
       <td className="py-2 pr-2">
-        <NumberInput
-          value={isStatic ? set.holdSeconds : set.reps}
-          placeholder={isStatic ? "30" : "8"}
-          aria-label={`${metricLabel} pour la série ${idx + 1}`}
-          onChange={(n) =>
-            onUpdate(isStatic ? { holdSeconds: n } : { reps: n })
-          }
-        />
+        <div className="flex items-center gap-0.5">
+          <NumberInput
+            value={mode === "reps" ? set.reps : set.holdSeconds}
+            placeholder={mode === "hold" ? "30" : "8"}
+            aria-label={`${metricLabel} pour la série ${idx + 1}`}
+            onChange={(n) =>
+              onUpdate(mode === "reps" ? { reps: n } : { holdSeconds: n })
+            }
+          />
+          <button
+            type="button"
+            onClick={() => onUpdate({ mode: otherMode })}
+            className="flex h-9 w-5 items-center justify-center rounded-md border border-border/60 text-[10px] tabular-nums text-muted-foreground hover:bg-muted"
+            aria-label={`Passer en mode ${otherMode === "reps" ? "répétitions" : "maintien"}`}
+            title={mode === "reps" ? "Maintien" : "Reps"}
+          >
+            {mode === "reps" ? "⌛" : "↺"}
+          </button>
+        </div>
       </td>
       <td className="py-2 pr-2">
-        <NumberInput
-          value={set.weightKg}
-          placeholder="0"
-          step={0.5}
-          aria-label={`Poids pour la série ${idx + 1}`}
-          onChange={(n) => onUpdate({ weightKg: n })}
-        />
+        {variants.length > 0 && (
+          <select
+            value={set.variantId ?? "__entry__"}
+            onChange={(e) =>
+              onUpdate({
+                variantId:
+                  e.target.value === "__entry__" ? undefined : e.target.value,
+              })
+            }
+            className="h-9 w-20 rounded-md border border-border/60 bg-transparent px-1.5 text-xs tabular-nums text-foreground outline-none focus:ring-2 focus:ring-ring"
+            aria-label={`Variante pour la série ${idx + 1}`}
+          >
+            <option value="__entry__">Défaut</option>
+            {variants.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </td>
+      <td className="py-2 pr-2">
+        <div className="flex items-center gap-0.5">
+          <NumberInput
+            value={set.weightKg}
+            placeholder="0"
+            step={0.5}
+            aria-label={`Poids pour la série ${idx + 1}`}
+            onChange={(n) => onUpdate({ weightKg: n })}
+          />
+          <button
+            type="button"
+            onClick={() => onUpdate({ weightKg: -(set.weightKg ?? 0) })}
+            className="flex h-9 w-5 items-center justify-center rounded-md border border-border/60 text-[10px] tabular-nums text-muted-foreground hover:bg-muted"
+            aria-label="Inverser le signe du poids"
+          >
+            ±
+          </button>
+        </div>
       </td>
       <td className="py-2 pr-2">
         <NumberInput
@@ -1067,6 +1190,7 @@ function SetRowMobile({
   isStatic,
   metricLabel,
   defaultRestSec,
+  variants,
   onUpdate,
   onRemove,
   onValidate,
@@ -1076,11 +1200,14 @@ function SetRowMobile({
   isStatic: boolean;
   metricLabel: string;
   defaultRestSec: number;
+  variants: { id: string; name: string; difficultyLevel: number }[];
   onUpdate: (patch: Partial<DraftSet>) => void;
   onRemove: () => void;
   onValidate: (validated: boolean) => void;
 }) {
   const validated = set.validated;
+  const mode = set.mode ?? (isStatic ? "hold" : "reps");
+  const otherMode = mode === "reps" ? "hold" : "reps";
   return (
     <div
       className={cn(
@@ -1112,21 +1239,65 @@ function SetRowMobile({
         </div>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <LabeledNumber
-          label={metricLabel}
-          value={isStatic ? set.holdSeconds : set.reps}
-          placeholder={isStatic ? "30" : "8"}
-          onChange={(n) =>
-            onUpdate(isStatic ? { holdSeconds: n } : { reps: n })
-          }
-        />
-        <LabeledNumber
-          label="Poids (kg)"
-          value={set.weightKg}
-          placeholder="0"
-          step={0.5}
-          onChange={(n) => onUpdate({ weightKg: n })}
-        />
+        <div className="space-y-1">
+          <div className="flex items-center gap-0.5">
+            <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {metricLabel}
+            </span>
+            <button
+              type="button"
+              onClick={() => onUpdate({ mode: otherMode })}
+              className="flex h-4 w-4 items-center justify-center rounded text-[9px] text-muted-foreground hover:text-foreground"
+              title={mode === "reps" ? "Maintien" : "Reps"}
+            >
+              {mode === "reps" ? "⌛" : "↺"}
+            </button>
+          </div>
+          <Input
+            type="number"
+            inputMode="decimal"
+            placeholder={mode === "hold" ? "30" : "8"}
+            value={mode === "reps" ? (set.reps ?? "") : (set.holdSeconds ?? "")}
+            onChange={(e) => {
+              const v = e.target.value;
+              onUpdate(
+                mode === "reps"
+                  ? { reps: v === "" ? undefined : Number(v) || undefined }
+                  : { holdSeconds: v === "" ? undefined : Number(v) || undefined },
+              );
+            }}
+            className="h-9 tabular-nums"
+          />
+        </div>
+        <div className="space-y-1">
+          <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Poids (kg)
+          </span>
+          <div className="flex items-center gap-0.5">
+            <Input
+              type="number"
+              inputMode="decimal"
+              step={0.5}
+              placeholder="0"
+              value={set.weightKg ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                onUpdate({
+                  weightKg: v === "" ? undefined : Number(v) || undefined,
+                });
+              }}
+              className="h-9 tabular-nums"
+            />
+            <button
+              type="button"
+              onClick={() => onUpdate({ weightKg: -(set.weightKg ?? 0) })}
+              className="flex h-9 w-5 shrink-0 items-center justify-center rounded-md border border-border/60 text-[10px] tabular-nums text-muted-foreground hover:bg-muted"
+              aria-label="Inverser le signe du poids"
+            >
+              ±
+            </button>
+          </div>
+        </div>
         <LabeledNumber
           label="RPE"
           value={set.rpe}
@@ -1136,6 +1307,30 @@ function SetRowMobile({
           onChange={(n) => onUpdate({ rpe: n })}
         />
       </div>
+      {variants.length > 0 && (
+        <div className="mt-2 flex items-center gap-2">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Variante
+          </span>
+          <select
+            value={set.variantId ?? "__entry__"}
+            onChange={(e) =>
+              onUpdate({
+                variantId:
+                  e.target.value === "__entry__" ? undefined : e.target.value,
+              })
+            }
+            className="h-7 flex-1 rounded-md border border-border/60 bg-transparent px-1.5 text-xs tabular-nums text-foreground outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="__entry__">Défaut</option>
+            {variants.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name} · Niv {v.difficultyLevel}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="mt-2 flex justify-end">
         <RestButton defaultRestSec={defaultRestSec} validated={validated} />
       </div>

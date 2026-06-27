@@ -992,11 +992,13 @@ function VariantFormDialog({
               <Input
                 id="var-level"
                 type="number"
-                min={1}
-                max={10}
-                value={form.difficultyLevel}
+                placeholder="1"
+                value={form.difficultyLevel || ""}
                 onChange={(e) =>
-                  update("difficultyLevel", Number(e.target.value) || 1)
+                  update(
+                    "difficultyLevel",
+                    e.target.value === "" ? 0 : Number(e.target.value),
+                  )
                 }
                 className="tabular-nums"
               />
@@ -1011,10 +1013,12 @@ function VariantFormDialog({
               <Input
                 id="var-target"
                 type="number"
-                min={0}
-                value={form.targetValue}
+                value={form.targetValue || ""}
                 onChange={(e) =>
-                  update("targetValue", Number(e.target.value) || 0)
+                  update(
+                    "targetValue",
+                    e.target.value === "" ? 0 : Number(e.target.value),
+                  )
                 }
                 placeholder="0 = aucun"
                 className="tabular-nums"

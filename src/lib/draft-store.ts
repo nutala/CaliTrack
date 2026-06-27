@@ -6,6 +6,7 @@
  * powers the "Repeat workout" feature via `loadFromWorkout`.
  */
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { format } from "date-fns";
 import type { ExerciseWithVariants, WorkoutFull } from "@/lib/types";
 
@@ -15,6 +16,8 @@ import type { ExerciseWithVariants, WorkoutFull } from "@/lib/types";
 
 export type DraftSet = {
   id: string;
+  variantId?: string | null;
+  mode?: "reps" | "hold";
   reps?: number;
   holdSeconds?: number;
   weightKg?: number;
@@ -38,7 +41,7 @@ export type WorkoutDraft = {
   date: string;
   durationMin: number | "";
   exertion: number;
-  bodyweight: number;
+  bodyweight: number | "";
   notes: string;
   defaultRestSec: number;
   entries: DraftEntry[];
@@ -65,7 +68,7 @@ function emptyDraft(): WorkoutDraft {
     date: format(new Date(), "yyyy-MM-dd"),
     durationMin: "",
     exertion: 5,
-    bodyweight: 72,
+    bodyweight: "",
     notes: "",
     defaultRestSec: 90,
     entries: [],
@@ -111,8 +114,10 @@ interface WorkoutDraftStore extends WorkoutDraft {
   ) => void;
 }
 
-export const useDraftStore = create<WorkoutDraftStore>((set, get) => ({
-  ...emptyDraft(),
+export const useDraftStore = create<WorkoutDraftStore>()(
+  persist(
+    (set, get) => ({
+      ...emptyDraft(),
 
   setMeta: (key, value) => set({ [key]: value } as Partial<WorkoutDraft>),
 
@@ -243,14 +248,30 @@ export const useDraftStore = create<WorkoutDraftStore>((set, get) => ({
       date: format(new Date(), "yyyy-MM-dd"),
       durationMin: workout.durationMin ?? "",
       exertion: workout.perceivedExertion ?? 5,
-      bodyweight: workout.bodyweightKg ?? 72,
+      bodyweight: workout.bodyweightKg ?? "",
       notes: workout.notes ?? "",
       defaultRestSec: 90,
       entries,
       sessionStartedAt: get().sessionStartedAt ?? Date.now(),
     });
   },
-}));
+}),
+    {
+      name: "calitrack-workout-draft",
+      partialize: (state) => ({
+        title: state.title,
+        date: state.date,
+        durationMin: state.durationMin,
+        exertion: state.exertion,
+        bodyweight: state.bodyweight,
+        notes: state.notes,
+        defaultRestSec: state.defaultRestSec,
+        entries: state.entries,
+        sessionStartedAt: state.sessionStartedAt,
+      }),
+    },
+  ),
+);
 
 /// Selector helper: compute the next available superset group number.
 export function nextSupersetGroup(entries: DraftEntry[]): number {
