@@ -13,7 +13,7 @@ export async function GET() {
     include: {
       exercise: { include: { variants: true } },
       variant: true,
-      sets: true,
+      sets: { include: { variant: true } },
       workout: { select: { date: true } },
     },
     orderBy: { workout: { date: "desc" } },
@@ -24,8 +24,18 @@ export async function GET() {
     const existing = map.get(e.exerciseId);
     const metric = e.sets.reduce((s, set) => s + (set.reps ?? set.holdSeconds ?? 0), 0);
     const bestSet = Math.max(...e.sets.map((s) => s.reps ?? s.holdSeconds ?? 0), 0);
-    const bestVariantLevel = e.variant?.difficultyLevel ?? 0;
-    const bestVariantName = e.variant?.name ?? null;
+
+    // Best variant: check both the entry variant and per-set variants
+    const allVariants = [
+      ...(e.variant ? [e.variant] : []),
+      ...e.sets.map((s) => s.variant).filter((v): v is NonNullable<typeof v> => v != null),
+    ];
+    const bestVariant = allVariants.reduce(
+      (best, v) => (!best || v.difficultyLevel > best.difficultyLevel ? v : best),
+      null as (typeof allVariants)[number] | null,
+    );
+    const bestVariantLevel = bestVariant?.difficultyLevel ?? 0;
+    const bestVariantName = bestVariant?.name ?? null;
 
     if (!existing) {
       map.set(e.exerciseId, {
