@@ -253,7 +253,7 @@ export function StatsView() {
               Volume total d'entraînement · 30 derniers jours
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-x-auto">
             {overviewLoading || !overview ? (
               <Skeleton className="h-[260px] w-full" />
             ) : volumeByCat.length === 0 ? (
@@ -323,7 +323,7 @@ export function StatsView() {
               Séances par catégorie · 30 derniers jours
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-x-auto">
             {overviewLoading || !overview ? (
               <Skeleton className="h-[260px] w-full" />
             ) : volumeByCat.length === 0 ? (
@@ -397,7 +397,7 @@ export function StatsView() {
               Nombre de séances par jour · 30 derniers jours
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-x-auto">
             {overviewLoading || !overview ? (
               <Skeleton className="h-[260px] w-full" />
             ) : frequencyData.length === 0 ? (
@@ -472,7 +472,7 @@ export function StatsView() {
               Intensité du volume d'entraînement · 30 derniers jours
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-x-auto">
             {overviewLoading || !overview ? (
               <Skeleton className="h-[200px] w-full" />
             ) : overview.activityCalendar.length === 0 ? (
