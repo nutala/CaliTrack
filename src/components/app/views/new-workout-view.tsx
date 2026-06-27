@@ -1040,7 +1040,7 @@ function RestButton({
   }
 
   return (
-    <div className="flex items-center gap-1 rounded-lg border bg-card p-1 shadow-sm">
+    <div className="flex items-center gap-1 overflow-x-auto rounded-lg border bg-card p-1 shadow-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {REST_PRESETS.map((p) => (
         <Button
           key={p.sec}
