@@ -14,7 +14,7 @@ export async function GET(req: Request) {
     where: userId ? { userId } : { userId: null },
     include: {
       entries: {
-        include: { exercise: true, variant: true, sets: true },
+        include: { exercise: true, variant: true, sets: { include: { variant: true } } },
         orderBy: { position: "asc" },
       },
     },

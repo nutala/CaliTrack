@@ -19,7 +19,6 @@ import {
   metricUnit,
   relativeFromNow,
   setMetric,
-  difficultyStars,
   variantLabel,
   supersetLabel,
   supersetColor,
@@ -547,8 +546,6 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
   const totalSets = entry.sets.length;
   const totalVol = entry.sets.reduce((a, s) => a + setMetric(s), 0);
   const best = entry.sets.reduce((m, s) => Math.max(m, setMetric(s)), 0);
-  const diff = entry.variant?.difficultyLevel ?? 1;
-
   const ssLabel = supersetLabel(entry.supersetGroup);
   const ssColor = supersetColor(entry.supersetGroup);
   const inSuperset = entry.supersetGroup != null;
@@ -575,7 +572,6 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
         </Badge>
         <span className="text-xs text-muted-foreground">
           {variantLabel(entry.variant)}
-          <span className="ml-1 tabular-nums">{difficultyStars(diff)}</span>
         </span>
         {inSuperset && ssColor && ssLabel && (
           <Badge
