@@ -264,7 +264,8 @@ export function StatsView() {
             ) : (
               <ChartContainer
                 config={volumeChartConfig}
-                className="block aspect-auto h-[260px] w-full"
+                className="aspect-auto h-[260px] w-full"
+                style={{ display: 'block' }}
               >
                 <BarChart
                   data={volumeByCat}
@@ -335,7 +336,8 @@ export function StatsView() {
               <div className="relative h-[260px]">
                 <ChartContainer
                   config={donutChartConfig}
-                  className="block aspect-auto h-full w-full"
+                  className="aspect-auto h-full w-full"
+                  style={{ display: 'block' }}
                 >
                   <PieChart>
                     <ChartTooltip
@@ -405,7 +407,8 @@ export function StatsView() {
             ) : (
               <ChartContainer
                 config={frequencyChartConfig}
-                className="block aspect-auto h-[260px] w-full"
+                className="aspect-auto h-[260px] w-full"
+                style={{ display: 'block' }}
               >
                 <BarChart
                   data={frequencyData}
@@ -621,7 +624,8 @@ export function StatsView() {
             <CardContent style={{ overflowX: 'auto' }}>
               <ChartContainer
                 config={trendChartConfig}
-                className="block aspect-auto h-[240px] w-full"
+                className="aspect-auto h-[240px] w-full"
+                style={{ display: 'block' }}
               >
                 <LineChart
                   data={trendData}
