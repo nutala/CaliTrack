@@ -8,11 +8,12 @@ import type {
   ExerciseVariant,
 } from "./types";
 import { format, parseISO, differenceInCalendarDays } from "date-fns";
+import { fr } from "date-fns/locale";
 
 /** Format a date (ISO string or Date) as a readable label. */
 export function fmtDate(iso: string | Date, pattern = "dd MMM yyyy"): string {
   const d = typeof iso === "string" ? parseISO(iso) : iso;
-  return format(d, pattern);
+  return format(d, pattern, { locale: fr });
 }
 
 export function fmtDateTime(iso: string | Date): string {
@@ -24,12 +25,12 @@ export function relativeFromNow(iso: string | Date | null): string {
   if (!iso) return "—";
   const d = typeof iso === "string" ? parseISO(iso) : iso;
   const days = differenceInCalendarDays(new Date(), d);
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return `${days} days ago`;
-  if (days < 30) return `${Math.floor(days / 7)}w ago`;
-  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
-  return `${Math.floor(days / 365)}y ago`;
+  if (days <= 0) return "Aujourd'hui";
+  if (days === 1) return "Hier";
+  if (days < 7) return `Il y a ${days} jours`;
+  if (days < 30) return `Il y a ${Math.floor(days / 7)} sem`;
+  if (days < 365) return `Il y a ${Math.floor(days / 30)} mois`;
+  return `Il y a ${Math.floor(days / 365)} ans`;
 }
 
 /** The primary performance metric for a set: reps (dynamic) or hold seconds (static). */

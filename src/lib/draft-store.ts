@@ -131,7 +131,13 @@ export const useDraftStore = create<WorkoutDraftStore>()(
           variantId: null,
           notes: "",
           supersetGroup: null,
-          sets: [{ id: uid(), validated: false }],
+          sets: [
+            {
+              id: uid(),
+              validated: false,
+              mode: exercise.isStatic ? "hold" : "reps",
+            },
+          ],
         },
       ],
     })),

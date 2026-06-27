@@ -674,10 +674,25 @@ function EntryCard({
   const metricLabel = isStatic ? "Maintien (s)" : "Reps";
 
   const totalSetsCount = sets.length;
-  const defMode = isStatic ? "hold" : "reps";
-  const totalVolume = sets.reduce((a, s) => a + draftMetric(s, defMode), 0);
-  const bestSet = sets.reduce((m, s) => Math.max(m, draftMetric(s, defMode)), 0);
   const validatedCount = sets.filter((s) => s.validated).length;
+  const repsVolume = sets.reduce((a, s) => {
+    const m = s.mode ?? (isStatic ? "hold" : "reps");
+    return a + (m === "reps" ? (s.reps ?? 0) : 0);
+  }, 0);
+  const holdVolume = sets.reduce((a, s) => {
+    const m = s.mode ?? (isStatic ? "hold" : "reps");
+    return a + (m === "hold" ? (s.holdSeconds ?? 0) : 0);
+  }, 0);
+  const bestReps = sets.reduce((m, s) => {
+    const mode = s.mode ?? (isStatic ? "hold" : "reps");
+    return mode === "reps" ? Math.max(m, s.reps ?? 0) : m;
+  }, 0);
+  const bestHold = sets.reduce((m, s) => {
+    const mode = s.mode ?? (isStatic ? "hold" : "reps");
+    return mode === "hold" ? Math.max(m, s.holdSeconds ?? 0) : m;
+  }, 0);
+  const hasReps = repsVolume > 0;
+  const hasHold = holdVolume > 0;
 
   const sortedVariants = exercise.variants
     ? exercise.variants.slice().sort((a, b) => a.difficultyLevel - b.difficultyLevel)
@@ -939,20 +954,50 @@ function EntryCard({
             </span>{" "}
             séries
           </span>
-          <span>
-            Volume{" "}
-            <span className="font-medium text-foreground tabular-nums">
-              {fmtCompact(totalVolume)}
-            </span>{" "}
-            {metricUnit(isStatic)}
-          </span>
-          <span>
-            Meilleure{" "}
-            <span className="font-medium text-foreground tabular-nums">
-              {fmtCompact(bestSet)}
-            </span>{" "}
-            {metricUnit(isStatic)}
-          </span>
+          {(hasReps || hasHold) && (
+            <span>
+              Volume{" "}
+              {hasReps && (
+                <>
+                  <span className="font-medium text-foreground tabular-nums">
+                    {fmtCompact(repsVolume)}
+                  </span>{" "}
+                  reps
+                </>
+              )}
+              {hasReps && hasHold && <span className="mx-0.5">·</span>}
+              {hasHold && (
+                <>
+                  <span className="font-medium text-foreground tabular-nums">
+                    {fmtCompact(holdVolume)}
+                  </span>{" "}
+                  s
+                </>
+              )}
+            </span>
+          )}
+          {(bestReps > 0 || bestHold > 0) && (
+            <span>
+              Meilleure{" "}
+              {bestReps > 0 && (
+                <>
+                  <span className="font-medium text-foreground tabular-nums">
+                    {fmtCompact(bestReps)}
+                  </span>{" "}
+                  reps
+                </>
+              )}
+              {bestReps > 0 && bestHold > 0 && <span className="mx-0.5">·</span>}
+              {bestHold > 0 && (
+                <>
+                  <span className="font-medium text-foreground tabular-nums">
+                    {fmtCompact(bestHold)}
+                  </span>{" "}
+                  s
+                </>
+              )}
+            </span>
+          )}
           {validatedCount > 0 && (
             <span className="text-emerald-500">
               <span className="font-medium tabular-nums">{validatedCount}</span> validée{validatedCount > 1 ? "s" : ""}
@@ -1127,7 +1172,7 @@ function SetRowDesktop({
                   e.target.value === "__entry__" ? undefined : e.target.value,
               })
             }
-            className="h-9 w-20 rounded-md border border-border/60 bg-transparent px-1.5 text-xs tabular-nums text-foreground outline-none focus:ring-2 focus:ring-ring"
+            className="h-9 w-20 rounded-md border border-border/60 bg-background px-1.5 text-xs tabular-nums text-foreground outline-none focus:ring-2 focus:ring-ring"
             aria-label={`Variante pour la série ${idx + 1}`}
           >
             <option value="__entry__">Défaut</option>
@@ -1329,7 +1374,7 @@ function SetRowMobile({
                   e.target.value === "__entry__" ? undefined : e.target.value,
               })
             }
-            className="h-7 flex-1 rounded-md border border-border/60 bg-transparent px-1.5 text-xs tabular-nums text-foreground outline-none focus:ring-2 focus:ring-ring"
+            className="h-7 flex-1 rounded-md border border-border/60 bg-background px-1.5 text-xs tabular-nums text-foreground outline-none focus:ring-2 focus:ring-ring"
           >
             <option value="__entry__">Défaut</option>
             {variants.map((v) => (

@@ -66,6 +66,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { format, parseISO } from "date-fns";
+import { fr } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Activity,
@@ -141,7 +142,7 @@ function groupByMonth(workouts: WorkoutFull[]): {
     const d = toDate(w.date);
     const key = `${d.getFullYear()}-${d.getMonth()}`;
     if (key !== currentKey) {
-      out.push({ key, label: format(d, "MMMM yyyy"), workouts: [w] });
+      out.push({ key, label: format(d, "MMMM yyyy", { locale: fr }), workouts: [w] });
       currentKey = key;
     } else {
       out[out.length - 1].workouts.push(w);
@@ -349,7 +350,7 @@ function WorkoutCard({
               {format(date, "dd")}
             </span>
             <span className="mt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-              {format(date, "EEE")}
+              {format(date, "EEE", { locale: fr })}
             </span>
           </div>
 
@@ -601,9 +602,7 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
             <thead>
               <tr className="text-left text-muted-foreground">
                 <th className="py-1 pr-3 font-medium">Série</th>
-                <th className="py-1 pr-3 font-medium">
-                  {isStatic ? "Maintien" : "Reps"}
-                </th>
+                <th className="py-1 pr-3 font-medium">Valeur</th>
                 <th className="py-1 pr-3 font-medium">kg</th>
                 <th className="py-1 font-medium">RPE</th>
               </tr>
@@ -615,8 +614,11 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
                     {s.setNumber}
                   </td>
                   <td className="py-1.5 pr-3 font-medium text-foreground">
-                    {setMetric(s)}{" "}
-                    <span className="text-muted-foreground">{unit}</span>
+                    {s.holdSeconds != null ? (
+                      <>{s.holdSeconds} <span className="text-muted-foreground">s</span></>
+                    ) : (
+                      <>{s.reps ?? "—"} <span className="text-muted-foreground">reps</span></>
+                    )}
                   </td>
                   <td className="py-1.5 pr-3 text-muted-foreground">
                     {s.weightKg != null ? `${s.weightKg}` : "—"}
