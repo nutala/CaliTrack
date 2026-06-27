@@ -30,10 +30,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
 
 function CaliLogo() {
   return (
-    <svg viewBox="0 0 32 32" className="h-10 w-10" aria-hidden="true" fill="none">
-      <rect width="32" height="32" rx="8" className="fill-primary" />
-      <text x="50%" y="54%" dominantBaseline="central" textAnchor="middle" fill="white" fontSize="16" fontWeight="700" fontFamily="system-ui">CT</text>
-    </svg>
+    <img src="/logo.png" alt="CaliTrack" className="h-12 w-12 rounded-xl" />
   );
 }
 

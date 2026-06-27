@@ -36,12 +36,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
 ];
 
 function CaliLogo({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden="true" focusable="false" fill="none">
-      <rect width="32" height="32" rx="8" className="fill-primary" />
-      <text x="50%" y="54%" dominantBaseline="central" textAnchor="middle" fill="white" fontSize="16" fontWeight="700" fontFamily="system-ui">CT</text>
-    </svg>
-  );
+  return <img src="/logo.png" alt="CaliTrack" className={`h-10 w-10 rounded-xl ${className ?? ""}`.trim()} />;
 }
 
 function GoogleLogo({ className }: { className?: string }) {
