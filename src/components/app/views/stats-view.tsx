@@ -253,7 +253,7 @@ export function StatsView() {
               Volume total d'entraînement · 30 derniers jours
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-x-auto">
             {overviewLoading || !overview ? (
               <Skeleton className="h-[260px] w-full" />
             ) : volumeByCat.length === 0 ? (
@@ -262,56 +262,52 @@ export function StatsView() {
                 description="Enregistre des séances dans les 30 derniers jours pour remplir ce graphique."
               />
             ) : (
-              <div className="overflow-x-auto">
-                <div className="min-w-[360px]">
-                  <ChartContainer
-                    config={volumeChartConfig}
-                    className="h-[260px] w-full"
-                  >
-                    <BarChart
-                      data={volumeByCat}
-                      margin={{ left: 4, right: 8, top: 8, bottom: 0 }}
-                    >
-                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="label"
-                        tickLine={false}
-                        axisLine={false}
-                        tickMargin={8}
+              <ChartContainer
+                config={volumeChartConfig}
+                className="block h-[260px] w-full"
+              >
+                <BarChart
+                  data={volumeByCat}
+                  margin={{ left: 4, right: 8, top: 8, bottom: 0 }}
+                >
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="label"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    width={36}
+                    tickFormatter={(v) => fmtCompact(Number(v))}
+                  />
+                  <ChartTooltip
+                    cursor={{ fill: "var(--muted)", opacity: 0.3 }}
+                    content={
+                      <ChartTooltipContent
+                        hideLabel
+                        formatter={(value, name) => (
+                          <div className="flex w-full items-center justify-between gap-3">
+                            <span className="text-muted-foreground">
+                              {String(name)}
+                            </span>
+                            <span className="font-mono font-medium tabular-nums">
+                              {fmtCompact(safeNum(value))}
+                            </span>
+                          </div>
+                        )}
                       />
-                      <YAxis
-                        tickLine={false}
-                        axisLine={false}
-                        width={36}
-                        tickFormatter={(v) => fmtCompact(Number(v))}
-                      />
-                      <ChartTooltip
-                        cursor={{ fill: "var(--muted)", opacity: 0.3 }}
-                        content={
-                          <ChartTooltipContent
-                            hideLabel
-                            formatter={(value, name) => (
-                              <div className="flex w-full items-center justify-between gap-3">
-                                <span className="text-muted-foreground">
-                                  {String(name)}
-                                </span>
-                                <span className="font-mono font-medium tabular-nums">
-                                  {fmtCompact(safeNum(value))}
-                                </span>
-                              </div>
-                            )}
-                          />
-                        }
-                      />
-                      <Bar dataKey="volume" radius={[6, 6, 0, 0]}>
-                        {volumeByCat.map((entry) => (
-                          <Cell key={entry.category} fill={entry.color} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ChartContainer>
-                </div>
-              </div>
+                    }
+                  />
+                  <Bar dataKey="volume" radius={[6, 6, 0, 0]}>
+                    {volumeByCat.map((entry) => (
+                      <Cell key={entry.category} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
             )}
           </CardContent>
         </Card>
@@ -327,7 +323,7 @@ export function StatsView() {
               Séances par catégorie · 30 derniers jours
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-x-auto">
             {overviewLoading || !overview ? (
               <Skeleton className="h-[260px] w-full" />
             ) : volumeByCat.length === 0 ? (
@@ -336,12 +332,11 @@ export function StatsView() {
                 description="Aucune séance récente à ventiler."
               />
             ) : (
-              <div className="overflow-x-auto">
-                <div className="relative min-w-[300px]">
-                  <ChartContainer
-                    config={donutChartConfig}
-                    className="h-[260px] w-full block"
-                  >
+              <div className="relative h-[260px]">
+                <ChartContainer
+                  config={donutChartConfig}
+                  className="block h-full w-full"
+                >
                   <PieChart>
                     <ChartTooltip
                       content={
@@ -387,7 +382,6 @@ export function StatsView() {
                   </span>
                 </div>
               </div>
-            </div>
             )}
           </CardContent>
         </Card>
@@ -403,70 +397,66 @@ export function StatsView() {
               Nombre de séances par jour · 30 derniers jours
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-x-auto">
             {overviewLoading || !overview ? (
               <Skeleton className="h-[260px] w-full" />
             ) : frequencyData.length === 0 ? (
               <EmptyState title="Pas de données" />
             ) : (
-              <div className="overflow-x-auto">
-                <div className="min-w-[360px]">
-                  <ChartContainer
-                    config={frequencyChartConfig}
-                    className="h-[260px] w-full"
-                  >
-                    <BarChart
-                      data={frequencyData}
-                      margin={{ left: 4, right: 8, top: 8, bottom: 0 }}
-                    >
-                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="label"
-                        tickLine={false}
-                        axisLine={false}
-                        tickMargin={8}
-                        interval="preserveStartEnd"
-                        minTickGap={16}
+              <ChartContainer
+                config={frequencyChartConfig}
+                className="block h-[260px] w-full"
+              >
+                <BarChart
+                  data={frequencyData}
+                  margin={{ left: 4, right: 8, top: 8, bottom: 0 }}
+                >
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="label"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    interval="preserveStartEnd"
+                    minTickGap={16}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    width={28}
+                    allowDecimals={false}
+                  />
+                  <ChartTooltip
+                    cursor={{ fill: "var(--muted)", opacity: 0.3 }}
+                    content={
+                      <ChartTooltipContent
+                        hideLabel
+                        formatter={(value, _name, item) => {
+                          const n = safeNum(value);
+                          return (
+                            <div className="flex w-full items-center justify-between gap-3">
+                              <span className="text-muted-foreground">
+                                {String(
+                                  (item?.payload as { label?: string } | undefined)
+                                    ?.label ?? "",
+                                )}
+                              </span>
+                              <span className="font-mono font-medium tabular-nums">
+                                {n} séance{n === 1 ? "" : "s"}
+                              </span>
+                            </div>
+                          );
+                        }}
                       />
-                      <YAxis
-                        tickLine={false}
-                        axisLine={false}
-                        width={28}
-                        allowDecimals={false}
-                      />
-                      <ChartTooltip
-                        cursor={{ fill: "var(--muted)", opacity: 0.3 }}
-                        content={
-                          <ChartTooltipContent
-                            hideLabel
-                            formatter={(value, _name, item) => {
-                              const n = safeNum(value);
-                              return (
-                                <div className="flex w-full items-center justify-between gap-3">
-                                  <span className="text-muted-foreground">
-                                    {String(
-                                      (item?.payload as { label?: string } | undefined)
-                                        ?.label ?? "",
-                                    )}
-                                  </span>
-                                  <span className="font-mono font-medium tabular-nums">
-                                    {n} séance{n === 1 ? "" : "s"}
-                                  </span>
-                                </div>
-                              );
-                            }}
-                          />
-                        }
-                      />
-                      <Bar
-                        dataKey="count"
-                        fill="var(--color-count)"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ChartContainer>
-                </div>
-              </div>
+                    }
+                  />
+                  <Bar
+                    dataKey="count"
+                    fill="var(--color-count)"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ChartContainer>
             )}
           </CardContent>
         </Card>
@@ -482,7 +472,7 @@ export function StatsView() {
               Intensité du volume d'entraînement · 30 derniers jours
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-x-auto">
             {overviewLoading || !overview ? (
               <Skeleton className="h-[200px] w-full" />
             ) : overview.activityCalendar.length === 0 ? (
