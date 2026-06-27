@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Pause, Play, X, Plus, SkipForward, Timer } from "lucide-react";
+import { Pause, Play, X, Plus, Minus, SkipForward, Timer } from "lucide-react";
 import { useTimerStore } from "@/lib/timer-store";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -194,6 +194,16 @@ export function RestTimerWidget() {
                       <Play className="h-4 w-4" />
                     </Button>
                   )}
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-8 w-8"
+                    onClick={() => timer.addTime(-15)}
+                    aria-label="Subtract 15 seconds"
+                    title="-15s"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
                   <Button
                     size="icon"
                     variant="outline"

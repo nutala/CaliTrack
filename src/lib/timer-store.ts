@@ -102,4 +102,6 @@ export const REST_PRESETS = [
   { sec: 90, label: "1m30" },
   { sec: 120, label: "2m" },
   { sec: 180, label: "3m" },
+  { sec: 240, label: "4m" },
+  { sec: 300, label: "5m" },
 ];

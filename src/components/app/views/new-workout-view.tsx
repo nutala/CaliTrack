@@ -1254,19 +1254,15 @@ function SetRowMobile({
         </div>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <div className="space-y-1">
-          <div className="flex items-center gap-1">
-            <Button
+          <div className="space-y-1">
+            <button
               type="button"
-              size="sm"
-              variant="ghost"
-              className="-ml-1.5 h-6 px-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
               onClick={() => onUpdate({ mode: otherMode })}
+              className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
               aria-label={`Passer en ${otherMode === "reps" ? "répétitions" : "maintien"}`}
             >
               {mode === "reps" ? "Reps" : "Maintien"}
-            </Button>
-          </div>
+            </button>
           <Input
             type="number"
             inputMode="decimal"
