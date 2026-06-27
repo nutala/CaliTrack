@@ -38,21 +38,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="flex items-center gap-2.5 group"
             aria-label="Aller au tableau de bord"
           >
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-sm transition-transform group-hover:scale-105">
-              <img
-                src="/logo.png"
-                alt="CaliTrack"
-                className="h-full w-full object-cover"
-              />
-            </div>
-            <div className="flex flex-col items-start leading-none">
-              <span className="text-base font-bold tracking-tight">
-                CaliTrack
-              </span>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                TRACK . PROGRESS . EVOLVE
-              </span>
-            </div>
+            <img
+              src="/logo.png"
+              alt="CaliTrack"
+              className="h-12 w-auto object-contain transition-transform group-hover:scale-105"
+            />
           </button>
 
           {/* Desktop nav */}
