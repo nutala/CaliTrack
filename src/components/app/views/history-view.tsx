@@ -593,41 +593,41 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-xs tabular-nums table-fixed">
             <colgroup>
-              <col className="w-12" />
-              <col />
-              <col className="w-24" />
-              <col className="w-14" />
-              <col className="w-14" />
+              <col className="w-[8%]" />
+              <col className="w-[38%]" />
+              <col className="w-[22%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-muted-foreground">
-                <th className="py-1 pr-2 font-medium">Série</th>
-                <th className="py-1 pr-2 font-medium">Variante</th>
-                <th className="py-1 pr-2 font-medium">Valeur</th>
-                <th className="py-1 pr-2 font-medium">kg</th>
+                <th className="py-1 font-medium">Série</th>
+                <th className="py-1 font-medium">Variante</th>
+                <th className="py-1 font-medium">Valeur</th>
+                <th className="py-1 font-medium">kg</th>
                 <th className="py-1 font-medium">RPE</th>
               </tr>
             </thead>
             <tbody>
               {entry.sets.map((s) => (
                 <tr key={s.id} className="border-t border-border/40">
-                  <td className="truncate py-1.5 pr-2 text-muted-foreground">
+                  <td className="py-1.5 pr-1 text-muted-foreground">
                     {s.setNumber}
                   </td>
-                  <td className="truncate py-1.5 pr-2 font-medium text-foreground">
+                  <td className="truncate py-1.5 pr-1 font-medium text-foreground">
                     {s.variant ? variantLabel(s.variant) : "—"}
                   </td>
-                  <td className="truncate py-1.5 pr-2 font-medium text-foreground">
+                  <td className="py-1.5 pr-1 font-medium text-foreground whitespace-nowrap">
                     {s.holdSeconds != null ? (
                       <>{s.holdSeconds} <span className="text-muted-foreground">s</span></>
                     ) : (
                       <>{s.reps ?? "—"} <span className="text-muted-foreground">reps</span></>
                     )}
                   </td>
-                  <td className="truncate py-1.5 pr-2 text-muted-foreground">
+                  <td className="py-1.5 pr-1 text-muted-foreground">
                     {s.weightKg != null ? `${s.weightKg}` : "—"}
                   </td>
-                  <td className="truncate py-1.5 text-muted-foreground">
+                  <td className="py-1.5 text-muted-foreground">
                     {s.rpe ?? "—"}
                   </td>
                 </tr>
