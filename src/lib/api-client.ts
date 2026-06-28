@@ -66,6 +66,7 @@ export const api = {
 export const qk = {
   exercises: ["exercises"] as const,
   exercise: (id: string) => ["exercises", id] as const,
+  exerciseRecords: (id: string) => ["exercises", id, "records"] as const,
   workouts: ["workouts"] as const,
   workout: (id: string) => ["workouts", id] as const,
   categories: ["categories"] as const,

@@ -1,9 +1,3 @@
-/**
- * Global UI store for the Calisthenics Tracker.
- * - Active view tab
- * - Quick actions (open new-workout from anywhere)
- * - Repeat-workout trigger (signals NewWorkoutView to load a prefill)
- */
 import { create } from "zustand";
 import type { WorkoutFull } from "@/lib/types";
 
@@ -13,19 +7,20 @@ export type ViewId =
   | "new-workout"
   | "history"
   | "stats"
-  | "profile";
+  | "profile"
+  | "exercise-detail";
 
 interface AppState {
   view: ViewId;
   setView: (v: ViewId) => void;
-  /// When the user clicks "Log workout" from elsewhere, jump to new-workout
   goNewWorkout: () => void;
 
-  /// ID of a workout to prefill the draft with (Repeat feature).
-  /// NewWorkoutView consumes this on mount via the draft store.
   repeatWorkoutId: string | null;
   repeatWorkout: (w: WorkoutFull) => void;
   consumeRepeat: () => string | null;
+
+  exerciseDetailId: string | null;
+  viewExerciseDetail: (id: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -41,4 +36,8 @@ export const useAppStore = create<AppState>((set) => ({
     if (id) set({ repeatWorkoutId: null });
     return id;
   },
+
+  exerciseDetailId: null,
+  viewExerciseDetail: (id) =>
+    set({ exerciseDetailId: id, view: "exercise-detail" }),
 }));

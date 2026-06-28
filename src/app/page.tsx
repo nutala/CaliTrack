@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app/app-shell";
 import { useAppStore } from "@/lib/store";
 import { DashboardView } from "@/components/app/views/dashboard-view";
 import { ExercisesView } from "@/components/app/views/exercises-view";
+import { ExerciseDetailView } from "@/components/app/views/exercise-detail-view";
 import { NewWorkoutView } from "@/components/app/views/new-workout-view";
 import { HistoryView } from "@/components/app/views/history-view";
 import { StatsView } from "@/components/app/views/stats-view";
@@ -52,6 +53,8 @@ function ViewRouter({ view }: { view: ReturnType<typeof useAppStore.getState>["v
       return <DashboardView />;
     case "exercises":
       return <ExercisesView />;
+    case "exercise-detail":
+      return <ExerciseDetailView />;
     case "new-workout":
       return <NewWorkoutView />;
     case "history":

@@ -16,6 +16,7 @@ import type {
   ProgressPoint,
   Exercise,
   Category,
+  ExerciseRecords,
 } from "@/lib/types";
 import { CATEGORY_META } from "@/lib/types";
 
@@ -232,6 +233,16 @@ export function useProgress(exerciseId?: string, variantId?: string | null) {
       if (variantId) params.set("variantId", variantId);
       return api.get(`/api/stats/progress?${params.toString()}`);
     },
+    enabled: !!exerciseId,
+  });
+}
+
+/** ----- Exercise Records (PRs) ----- */
+export function useExerciseRecords(exerciseId: string | null) {
+  return useQuery<ExerciseRecords>({
+    queryKey: qk.exerciseRecords(exerciseId ?? ""),
+    queryFn: () =>
+      api.get<ExerciseRecords>(`/api/exercises/${exerciseId}/records`),
     enabled: !!exerciseId,
   });
 }

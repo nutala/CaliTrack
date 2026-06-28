@@ -75,6 +75,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { useAppStore } from "@/lib/store";
 
 /* ------------------------------------------------------------------ */
 /* Form state types                                                   */
@@ -403,6 +404,9 @@ export function ExercisesView() {
                       <ExerciseCard
                         key={ex.id}
                         exercise={ex}
+                        onViewDetail={() =>
+                          useAppStore.getState().viewExerciseDetail(ex.id)
+                        }
                         onEdit={() => openEditExercise(ex)}
                         onDelete={() => setDeletingExercise(ex)}
                         onAddVariant={() => openAddVariant(ex.id, ex.isStatic)}
@@ -522,6 +526,7 @@ export function ExercisesView() {
 
 function ExerciseCard({
   exercise,
+  onViewDetail,
   onEdit,
   onDelete,
   onAddVariant,
@@ -529,6 +534,7 @@ function ExerciseCard({
   onDeleteVariant,
 }: {
   exercise: ExerciseWithVariants;
+  onViewDetail: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onAddVariant: () => void;
@@ -548,8 +554,9 @@ function ExerciseCard({
 
   return (
     <Card
-      className="overflow-hidden py-0"
+      className="cursor-pointer overflow-hidden py-0 transition-shadow hover:shadow-md"
       style={{ borderLeftWidth: 4, borderLeftColor: meta.color }}
+      onClick={onViewDetail}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3 px-4 pt-4">

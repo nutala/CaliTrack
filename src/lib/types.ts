@@ -91,3 +91,37 @@ export interface TopExercise {
   topVariantName: string | null;
   lastPerformed: string | null;
 }
+
+export interface VariantRecord {
+  variantId: string;
+  variantName: string;
+  targetValue: number | null;
+  difficultyLevel: number;
+  allTimeBest: {
+    value: number;
+    unit: string;
+    weightKg: number | null;
+    rpe: number | null;
+    date: string;
+    workoutId: string;
+  } | null;
+  recentPerformances: {
+    value: number;
+    weightKg: number | null;
+    rpe: number | null;
+    date: string;
+    workoutId: string;
+  }[];
+}
+
+export interface ExerciseRecords {
+  exercise: {
+    id: string;
+    name: string;
+    category: string;
+    isStatic: boolean;
+    description: string | null;
+    equipment: string | null;
+  };
+  variants: VariantRecord[];
+}
