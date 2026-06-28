@@ -176,7 +176,7 @@ export function LoginDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="mb-2 flex justify-center">
-            <CaliLogo className="h-10 w-10" />
+            <CaliLogo className="h-20 w-20" />
           </div>
           <DialogTitle className="text-center">
             {mode === "register" ? "Créer un compte" : "Se connecter"}

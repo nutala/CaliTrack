@@ -30,7 +30,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
 
 function CaliLogo() {
   return (
-    <img src="/logo.png" alt="CaliTrack" className="h-12 w-12 rounded-xl" />
+    <img src="/logo.png" alt="CaliTrack" className="h-24 w-24 rounded-xl" />
   );
 }
 
