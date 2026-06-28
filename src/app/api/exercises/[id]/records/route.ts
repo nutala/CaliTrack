@@ -123,7 +123,6 @@ export async function GET(_req: Request, { params }: Params) {
       }
     }
     const bestByWeight = Array.from(byWeight.entries())
-      .sort(([a], [b]) => a - b)
       .map(([weight, s]) => ({
         value: metric(s),
         unit,
@@ -131,7 +130,8 @@ export async function GET(_req: Request, { params }: Params) {
         rpe: s.rpe,
         date: format(s.workoutDate, "yyyy-MM-dd"),
         workoutId: s.workoutId,
-      }));
+      }))
+      .sort((a, b) => b.value - a.value || (b.weightKg ?? 0) - (a.weightKg ?? 0));
 
     const recentPerfs = relevantEntries
       .filter((e) => e.sets.some((s) => s.variantId === v.id))
