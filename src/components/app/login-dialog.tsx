@@ -36,7 +36,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
 ];
 
 function CaliLogo({ className }: { className?: string }) {
-  return <img src="/logo.png" alt="CaliTrack" className={`h-10 w-10 rounded-xl ${className ?? ""}`.trim()} />;
+  return <img src="/logo.png" alt="Gravio" className={`h-10 w-10 rounded-xl ${className ?? ""}`.trim()} />;
 }
 
 function GoogleLogo({ className }: { className?: string }) {
@@ -183,10 +183,10 @@ export function LoginDialog({
           </DialogTitle>
           <DialogDescription className="text-center">
             {mode === "register"
-              ? "Inscris-toi pour suivre tes progrès sur CaliTrack."
+              ? "Inscris-toi pour suivre tes progrès sur Gravio."
               : mode === "login"
                 ? "Connecte-toi avec ton email et mot de passe."
-                : "Choisis une méthode pour continuer sur CaliTrack."}
+                : "Choisis une méthode pour continuer sur Gravio."}
           </DialogDescription>
         </DialogHeader>
 

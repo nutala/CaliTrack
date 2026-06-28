@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CaliTrack — Suivi de performance calisthénie",
+  title: "Gravio — Suivi de performance calisthénie",
   description:
     "Suis tes séances de calisthénie, tes variantes de progression (full planche, straddle, tuck...) et visualise tes performances avec des tableaux de bord détaillés.",
   icons: {
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     "poids du corps",
     "progression",
   ],
-  authors: [{ name: "CaliTrack" }],
+  authors: [{ name: "Gravio" }],
 };
 
 export const viewport: Viewport = {
