@@ -109,42 +109,51 @@ function VariantRecordCard({ record }: { record: VariantRecord }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* All-time best — clickable to open workout */}
+          {/* Best by weight category */}
           {hasBest ? (
-            <button
-              type="button"
-              onClick={() => setDialogWorkoutId(record.allTimeBest!.workoutId)}
-              className="w-full rounded-lg border border-primary/20 bg-primary/5 p-3 text-left transition-colors hover:bg-primary/10"
-            >
-              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-primary">
-                <Trophy className="h-3.5 w-3.5" />
-                Meilleure performance
+            <div className="space-y-1.5">
+              <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Trophy className="h-3.5 w-3.5 text-primary" />
+                Meilleures performances
+              </p>
+              <div className="space-y-1">
+                {record.bestByWeight.map((bw, i) => (
+                  <button
+                    key={`${bw.workoutId}-${bw.weightKg ?? 0}-${i}`}
+                    type="button"
+                    onClick={() => setDialogWorkoutId(bw.workoutId)}
+                    className="flex w-full items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent/40"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                        {i + 1}
+                      </span>
+                      <div>
+                        <span className="text-lg font-bold tabular-nums text-foreground">
+                          {bw.value}
+                          <span className="ml-0.5 text-sm font-normal text-muted-foreground">
+                            {bw.unit}
+                          </span>
+                        </span>
+                        {bw.weightKg != null ? (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            +{bw.weightKg} kg
+                          </span>
+                        ) : (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            poids du corps
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      {bw.rpe != null && <span>RPE {bw.rpe}</span>}
+                      <span className="tabular-nums">{bw.date}</span>
+                    </div>
+                  </button>
+                ))}
               </div>
-              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                <span className="text-2xl font-bold tabular-nums text-foreground">
-                  {record.allTimeBest.value}
-                  <span className="ml-0.5 text-sm font-normal text-muted-foreground">
-                    {record.allTimeBest.unit}
-                  </span>
-                </span>
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Calendar className="h-3 w-3" />
-                  {record.allTimeBest.date}
-                </span>
-                {record.allTimeBest.weightKg != null && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Weight className="h-3 w-3" />
-                    {record.allTimeBest.weightKg} kg
-                  </span>
-                )}
-                {record.allTimeBest.rpe != null && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Gauge className="h-3 w-3" />
-                    RPE {record.allTimeBest.rpe}
-                  </span>
-                )}
-              </div>
-            </button>
+            </div>
           ) : (
             <div className="flex items-center gap-2 rounded-lg bg-muted/30 p-3 text-xs text-muted-foreground">
               <Trophy className="h-3.5 w-3.5 opacity-40" />

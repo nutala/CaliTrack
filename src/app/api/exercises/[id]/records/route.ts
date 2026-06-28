@@ -19,6 +19,14 @@ export interface VariantRecord {
     date: string;
     workoutId: string;
   } | null;
+  bestByWeight: {
+    value: number;
+    unit: string;
+    weightKg: number | null;
+    rpe: number | null;
+    date: string;
+    workoutId: string;
+  }[];
   recentPerformances: {
     value: number;
     weightKg: number | null;
@@ -94,6 +102,7 @@ export async function GET(_req: Request, { params }: Params) {
         targetValue: v.targetValue,
         difficultyLevel: v.difficultyLevel,
         allTimeBest: null,
+        bestByWeight: [],
         recentPerformances: [],
         prHistory: [],
       };
@@ -103,6 +112,26 @@ export async function GET(_req: Request, { params }: Params) {
       s.reps ?? s.holdSeconds ?? 0;
 
     const bestSet = allSets.reduce((a, b) => (metric(a) >= metric(b) ? a : b));
+
+    /* Best per weight category */
+    const byWeight = new Map<number, typeof allSets[number]>();
+    for (const s of allSets) {
+      const w = s.weightKg ?? 0;
+      const existing = byWeight.get(w);
+      if (!existing || metric(s) > metric(existing)) {
+        byWeight.set(w, s);
+      }
+    }
+    const bestByWeight = Array.from(byWeight.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([weight, s]) => ({
+        value: metric(s),
+        unit,
+        weightKg: s.weightKg,
+        rpe: s.rpe,
+        date: format(s.workoutDate, "yyyy-MM-dd"),
+        workoutId: s.workoutId,
+      }));
 
     const recentPerfs = relevantEntries
       .filter((e) => e.sets.some((s) => s.variantId === v.id))
@@ -163,6 +192,7 @@ export async function GET(_req: Request, { params }: Params) {
         date: format(bestSet.workoutDate, "yyyy-MM-dd"),
         workoutId: bestSet.workoutId,
       },
+      bestByWeight,
       recentPerformances: recentPerfs,
       prHistory: prHistory.reverse(),
     };

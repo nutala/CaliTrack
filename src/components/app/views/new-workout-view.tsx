@@ -692,7 +692,7 @@ function EntryCard({
     const lastSet = sets[sets.length - 1];
     const defaults: Partial<DraftSet> = {};
     if (lastSet?.variantId) defaults.variantId = lastSet.variantId;
-    else if (variants.length > 0) defaults.variantId = variants[0].id;
+    else if (sortedVariants.length > 0) defaults.variantId = sortedVariants[0].id;
     if (lastSet?.mode) defaults.mode = lastSet.mode;
     onAddSet(defaults);
   }

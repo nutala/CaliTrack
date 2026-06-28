@@ -105,6 +105,14 @@ export interface VariantRecord {
     date: string;
     workoutId: string;
   } | null;
+  bestByWeight: {
+    value: number;
+    unit: string;
+    weightKg: number | null;
+    rpe: number | null;
+    date: string;
+    workoutId: string;
+  }[];
   recentPerformances: {
     value: number;
     weightKg: number | null;
