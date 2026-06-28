@@ -593,9 +593,9 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-xs tabular-nums table-fixed">
             <colgroup>
-              <col className="w-[8%]" />
-              <col className="w-[38%]" />
-              <col className="w-[22%]" />
+              <col className="w-[10%]" />
+              <col className="w-[34%]" />
+              <col className="w-[24%]" />
               <col className="w-[16%]" />
               <col className="w-[16%]" />
             </colgroup>
@@ -611,23 +611,23 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
             <tbody>
               {entry.sets.map((s) => (
                 <tr key={s.id} className="border-t border-border/40">
-                  <td className="py-1.5 pr-1 text-muted-foreground">
+                  <td className="truncate py-1.5 pr-1 text-muted-foreground">
                     {s.setNumber}
                   </td>
                   <td className="truncate py-1.5 pr-1 font-medium text-foreground">
                     {s.variant ? variantLabel(s.variant) : "—"}
                   </td>
-                  <td className="py-1.5 pr-1 font-medium text-foreground whitespace-nowrap">
+                  <td className="truncate py-1.5 pr-1 font-medium text-foreground">
                     {s.holdSeconds != null ? (
                       <>{s.holdSeconds} <span className="text-muted-foreground">s</span></>
                     ) : (
                       <>{s.reps ?? "—"} <span className="text-muted-foreground">reps</span></>
                     )}
                   </td>
-                  <td className="py-1.5 pr-1 text-muted-foreground">
+                  <td className="truncate py-1.5 pr-1 text-muted-foreground">
                     {s.weightKg != null ? `${s.weightKg}` : "—"}
                   </td>
-                  <td className="py-1.5 text-muted-foreground">
+                  <td className="truncate py-1.5 text-muted-foreground">
                     {s.rpe ?? "—"}
                   </td>
                 </tr>
