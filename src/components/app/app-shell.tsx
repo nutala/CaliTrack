@@ -41,7 +41,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <img
               src="/logo.png"
               alt="CaliTrack"
-              className="h-12 w-auto object-contain transition-transform group-hover:scale-105"
+              className="h-20 w-auto object-contain transition-transform group-hover:scale-105"
             />
           </button>
 
