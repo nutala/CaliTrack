@@ -74,7 +74,7 @@ export function metricUnit(isStatic: boolean): string {
 
 /** Pretty label for a variant, including its difficulty rank. */
 export function variantLabel(variant: ExerciseVariant | null): string {
-  if (!variant) return "Standard";
+  if (!variant) return "—";
   return variant.name;
 }
 

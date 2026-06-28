@@ -250,17 +250,19 @@ export function NewWorkoutView() {
       bodyweightKg: bodyweight === "" ? undefined : bodyweight,
       notes: notes.trim() || undefined,
       entries: entries.map((e) => {
+        const ex = exerciseMap.get(e.exerciseId);
+        const firstVariant = ex?.variants[0]?.id;
         return {
           exerciseId: e.exerciseId,
-          variantId: e.variantId,
+          variantId: e.variantId ?? firstVariant ?? null,
           supersetGroup: e.supersetGroup,
           notes: e.notes.trim() || undefined,
           sets: e.sets.map((s) => {
             const mode = s.mode ?? (
-              exerciseMap.get(e.exerciseId)?.isStatic ? "hold" : "reps"
+              ex?.isStatic ? "hold" : "reps"
             );
             return {
-              variantId: s.variantId ?? null,
+              variantId: s.variantId ?? firstVariant ?? null,
               reps: mode === "reps" ? s.reps : undefined,
               holdSeconds: mode === "hold" ? s.holdSeconds : undefined,
               weightKg: s.weightKg,
@@ -690,6 +692,7 @@ function EntryCard({
     const lastSet = sets[sets.length - 1];
     const defaults: Partial<DraftSet> = {};
     if (lastSet?.variantId) defaults.variantId = lastSet.variantId;
+    else if (variants.length > 0) defaults.variantId = variants[0].id;
     if (lastSet?.mode) defaults.mode = lastSet.mode;
     onAddSet(defaults);
   }
@@ -1126,17 +1129,11 @@ function SetRowDesktop({
       <td className="py-2 pr-2">
         {variants.length > 0 && (
           <select
-            value={set.variantId ?? "__entry__"}
-            onChange={(e) =>
-              onUpdate({
-                variantId:
-                  e.target.value === "__entry__" ? undefined : e.target.value,
-              })
-            }
+            value={set.variantId ?? variants[0]?.id}
+            onChange={(e) => onUpdate({ variantId: e.target.value })}
             className="h-9 w-20 rounded-md border border-border/60 bg-background px-1.5 text-xs tabular-nums text-foreground outline-none focus:ring-2 focus:ring-ring"
             aria-label={`Variante pour la série ${idx + 1}`}
           >
-            <option value="__entry__">Défaut</option>
             {variants.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.name} {difficultyStars(v.difficultyLevel)}
@@ -1323,16 +1320,10 @@ function SetRowMobile({
             Variante
           </span>
           <select
-            value={set.variantId ?? "__entry__"}
-            onChange={(e) =>
-              onUpdate({
-                variantId:
-                  e.target.value === "__entry__" ? undefined : e.target.value,
-              })
-            }
+            value={set.variantId ?? variants[0]?.id}
+            onChange={(e) => onUpdate({ variantId: e.target.value })}
             className="h-7 min-w-0 flex-1 rounded-md border border-border/60 bg-background px-1.5 text-xs tabular-nums text-foreground outline-none focus:ring-2 focus:ring-ring"
           >
-            <option value="__entry__">Défaut</option>
             {variants.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.name} {difficultyStars(v.difficultyLevel)}

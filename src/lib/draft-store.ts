@@ -247,6 +247,7 @@ export const useDraftStore = create<WorkoutDraftStore>()(
         supersetGroup: e.supersetGroup ?? null,
         sets: e.sets.map((st) => ({
           id: uid(),
+          variantId: st.variantId ?? undefined,
           reps: st.reps ?? undefined,
           holdSeconds: st.holdSeconds ?? undefined,
           weightKg: st.weightKg ?? undefined,
