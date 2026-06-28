@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GravioLogo } from "@/components/gravio-logo";
 
 type DemoAccount = {
   name: string;
@@ -36,7 +37,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
 ];
 
 function CaliLogo({ className }: { className?: string }) {
-  return <img src="/logo.png" alt="Gravio" className={`h-10 w-10 rounded-xl ${className ?? ""}`.trim()} />;
+  return <GravioLogo className={`h-10 w-10 rounded-xl ${className ?? ""}`.trim()} />;
 }
 
 function GoogleLogo({ className }: { className?: string }) {

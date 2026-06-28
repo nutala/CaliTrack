@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { GravioLogo } from "@/components/gravio-logo";
 
 type DemoAccount = {
   name: string;
@@ -29,9 +30,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
 ];
 
 function CaliLogo() {
-  return (
-    <img src="/logo.png" alt="Gravio" className="h-24 w-24 rounded-xl" />
-  );
+  return <GravioLogo className="h-24 w-24 rounded-xl" />;
 }
 
 function GoogleLogo({ className }: { className?: string }) {

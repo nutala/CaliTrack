@@ -10,6 +10,7 @@ import {
   Activity,
 } from "lucide-react";
 import { useAppStore, type ViewId } from "@/lib/store";
+import { GravioLogo } from "@/components/gravio-logo";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import { UserMenu } from "@/components/app/user-menu";
@@ -38,11 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="flex items-center gap-2.5 group"
             aria-label="Aller au tableau de bord"
           >
-            <img
-              src="/logo.png"
-              alt="Gravio"
-              className="h-20 w-auto object-contain transition-transform group-hover:scale-105"
-            />
+            <GravioLogo className="h-20 w-auto object-contain transition-transform group-hover:scale-105" />
           </button>
 
           {/* Desktop nav */}
