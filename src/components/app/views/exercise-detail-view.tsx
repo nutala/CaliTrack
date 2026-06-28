@@ -95,7 +95,7 @@ function VariantRecordCard({ record }: { record: VariantRecord }) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {hasBest && (
+            {hasPrHistory && (
               <Button
                 variant="outline"
                 size="sm"
