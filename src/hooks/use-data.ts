@@ -135,6 +135,14 @@ export function useWorkouts() {
   });
 }
 
+export function useWorkout(id: string | null) {
+  return useQuery<WorkoutFull>({
+    queryKey: qk.workout(id ?? ""),
+    queryFn: () => api.get<WorkoutFull>(`/api/workouts/${id}`),
+    enabled: !!id,
+  });
+}
+
 export type NewWorkoutPayload = {
   date?: string;
   title?: string;

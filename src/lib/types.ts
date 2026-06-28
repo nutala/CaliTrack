@@ -112,6 +112,14 @@ export interface VariantRecord {
     date: string;
     workoutId: string;
   }[];
+  prHistory: {
+    value: number;
+    unit: string;
+    weightKg: number | null;
+    rpe: number | null;
+    date: string;
+    workoutId: string;
+  }[];
 }
 
 export interface ExerciseRecords {

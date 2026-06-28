@@ -26,6 +26,14 @@ export interface VariantRecord {
     date: string;
     workoutId: string;
   }[];
+  prHistory: {
+    value: number;
+    unit: string;
+    weightKg: number | null;
+    rpe: number | null;
+    date: string;
+    workoutId: string;
+  }[];
 }
 
 export interface ExerciseRecords {
@@ -87,6 +95,7 @@ export async function GET(_req: Request, { params }: Params) {
         difficultyLevel: v.difficultyLevel,
         allTimeBest: null,
         recentPerformances: [],
+        prHistory: [],
       };
     }
 
@@ -114,6 +123,33 @@ export async function GET(_req: Request, { params }: Params) {
         };
       });
 
+    /* PR history: walk entries chronologically, record every new best */
+    const entriesAsc = [...relevantEntries]
+      .filter((e) => e.sets.some((s) => s.variantId === v.id))
+      .sort((a, b) => a.workout.date.getTime() - b.workout.date.getTime());
+
+    let previousBest = -1;
+    const prHistory: typeof recentPerfs = [];
+    for (const e of entriesAsc) {
+      const variantSets = e.sets.filter((s) => s.variantId === v.id);
+      const entryBest = variantSets.reduce((a, b) => {
+        const mA = a.reps ?? a.holdSeconds ?? 0;
+        const mB = b.reps ?? b.holdSeconds ?? 0;
+        return mA >= mB ? a : b;
+      });
+      const entryVal = metric(entryBest);
+      if (entryVal > previousBest) {
+        previousBest = entryVal;
+        prHistory.push({
+          value: entryVal,
+          weightKg: entryBest.weightKg,
+          rpe: entryBest.rpe,
+          date: format(e.workout.date, "yyyy-MM-dd"),
+          workoutId: e.workoutId,
+        });
+      }
+    }
+
     return {
       variantId: v.id,
       variantName: v.name,
@@ -128,6 +164,7 @@ export async function GET(_req: Request, { params }: Params) {
         workoutId: bestSet.workoutId,
       },
       recentPerformances: recentPerfs,
+      prHistory: prHistory.reverse(),
     };
   });
 
