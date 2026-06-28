@@ -69,6 +69,7 @@ import { fr } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Activity,
+  CalendarDays,
   ChevronDown,
   ChevronRight,
   Dumbbell,
@@ -85,6 +86,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -159,6 +161,8 @@ export function HistoryView() {
   const [search, setSearch] = React.useState("");
   const [sort, setSort] = React.useState<"newest" | "oldest">("newest");
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const [showCalendar, setShowCalendar] = React.useState(false);
+  const [selectedDay, setSelectedDay] = React.useState<Date | undefined>(undefined);
 
   const workouts = React.useMemo(() => {
     if (!data) return [];
@@ -172,6 +176,20 @@ export function HistoryView() {
   }, [data, search, sort]);
 
   const groups = React.useMemo(() => groupByMonth(workouts), [workouts]);
+
+  const workoutDays = React.useMemo(() => {
+    const days = new Set<string>();
+    for (const w of workouts) {
+      days.add(format(toDate(w.date), "yyyy-MM-dd"));
+    }
+    return days;
+  }, [workouts]);
+
+  const dayWorkouts = React.useMemo(() => {
+    if (!selectedDay) return [];
+    const key = format(selectedDay, "yyyy-MM-dd");
+    return workouts.filter((w) => format(toDate(w.date), "yyyy-MM-dd") === key);
+  }, [selectedDay, workouts]);
 
   /* ---- Loading / error / empty states ---- */
   if (isLoading) {
@@ -218,9 +236,63 @@ export function HistoryView() {
         onSort={setSort}
         total={data.length}
         showing={workouts.length}
+        showCalendar={showCalendar}
+        onToggleCalendar={() => {
+          setShowCalendar((p) => !p);
+          setSelectedDay(undefined);
+        }}
       />
 
-      {workouts.length === 0 ? (
+      {showCalendar ? (
+        <div className="space-y-4">
+          <div className="flex justify-center">
+            <Calendar
+              mode="single"
+              selected={selectedDay}
+              onSelect={setSelectedDay}
+              locale={fr}
+              modifiers={{
+                hasWorkout: (date) =>
+                  workoutDays.has(format(date, "yyyy-MM-dd")),
+              }}
+              modifiersStyles={{
+                hasWorkout: {
+                  fontWeight: 700,
+                  backgroundColor: "hsl(var(--primary) / 0.15)",
+                  color: "hsl(var(--primary))",
+                  borderRadius: "9999px",
+                },
+              }}
+              className="rounded-lg border border-border/60"
+            />
+          </div>
+
+          {selectedDay && dayWorkouts.length > 0 ? (
+            <div className="space-y-3">
+              {dayWorkouts.map((w) => (
+                <WorkoutCard
+                  key={w.id}
+                  workout={w}
+                  expanded={expandedId === w.id}
+                  onToggle={() =>
+                    setExpandedId((prev) => (prev === w.id ? null : w.id))
+                  }
+                />
+              ))}
+            </div>
+          ) : selectedDay ? (
+            <EmptyState
+              icon={Search}
+              title="Aucune séance"
+              description={format(selectedDay, "EEEE d MMMM yyyy", { locale: fr })}
+            />
+          ) : (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              Sélectionne un jour pour voir les séances.
+            </div>
+          )}
+        </div>
+      ) : workouts.length === 0 ? (
         <EmptyState
           icon={Search}
           title="Aucun résultat"
@@ -272,6 +344,8 @@ function Toolbar({
   onSort,
   total,
   showing,
+  showCalendar,
+  onToggleCalendar,
 }: {
   search: string;
   onSearch: (v: string) => void;
@@ -279,6 +353,8 @@ function Toolbar({
   onSort: (v: "newest" | "oldest") => void;
   total: number;
   showing: number;
+  showCalendar: boolean;
+  onToggleCalendar: () => void;
 }) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -293,6 +369,16 @@ function Toolbar({
         />
       </div>
       <div className="flex items-center justify-between gap-3 sm:justify-end">
+        <Button
+          variant={showCalendar ? "default" : "outline"}
+          size="sm"
+          className="h-9 gap-1.5"
+          onClick={onToggleCalendar}
+          aria-label="Vue calendrier"
+        >
+          <CalendarDays className="h-4 w-4" />
+          {showCalendar ? "Liste" : "Calendrier"}
+        </Button>
         <span className="text-xs tabular-nums text-muted-foreground">
           {showing}/{total} séances
         </span>
