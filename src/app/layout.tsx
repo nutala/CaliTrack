@@ -23,9 +23,11 @@ export const metadata: Metadata = {
   description:
     "Suis tes séances de calisthénie, tes variantes de progression (full planche, straddle, tuck...) et visualise tes performances avec des tableaux de bord détaillés.",
   icons: {
-    icon: "/logo.png",
-    shortcut: "/logo.png",
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
   },
+  manifest: "/manifest.json",
   other: {
     "theme-color": "#18181b",
   },
