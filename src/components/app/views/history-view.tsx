@@ -246,21 +246,37 @@ export function HistoryView() {
       {showCalendar ? (
         <div className="space-y-4">
           <div className="flex justify-center">
-            <Calendar
-              mode="single"
-              selected={selectedDay}
-              onSelect={setSelectedDay}
-              locale={fr}
-              modifiers={{
-                hasWorkout: (date) =>
-                  workoutDays.has(format(date, "yyyy-MM-dd")),
-              }}
-              modifiersClassNames={{
-                hasWorkout:
-                  "!bg-primary/15 !text-primary !font-bold rounded-full",
-              }}
-              className="rounded-lg border border-border/60"
-            />
+              <Calendar
+                mode="single"
+                selected={selectedDay}
+                onSelect={setSelectedDay}
+                locale={fr}
+                modifiers={{
+                  hasWorkout: (date) =>
+                    workoutDays.has(format(date, "yyyy-MM-dd")),
+                }}
+                className="rounded-lg border border-border/60"
+              />
+              <style>{`
+                .rdp-day_hasWorkout button {
+                  font-weight: 600 !important;
+                }
+                .rdp-day_hasWorkout button::after {
+                  content: '';
+                  position: absolute;
+                  bottom: 1px;
+                  left: 50%;
+                  transform: translateX(-50%);
+                  width: 5px;
+                  height: 5px;
+                  border-radius: 9999px;
+                  background: hsl(var(--primary) / 0.7);
+                }
+                .rdp-day_hasWorkout[data-selected=true] button::after,
+                .rdp td[data-selected=true] .rdp-day_hasWorkout button::after {
+                  background: hsl(var(--primary-foreground));
+                }
+              `}</style>
           </div>
 
           {selectedDay && dayWorkouts.length > 0 ? (
