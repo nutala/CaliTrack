@@ -8,7 +8,9 @@ export type ViewId =
   | "history"
   | "stats"
   | "profile"
-  | "exercise-detail";
+  | "exercise-detail"
+  | "templates"
+  | "template-editor";
 
 interface AppState {
   view: ViewId;
@@ -21,6 +23,10 @@ interface AppState {
 
   exerciseDetailId: string | null;
   viewExerciseDetail: (id: string) => void;
+
+  templateEditorId: string | null;
+  viewTemplateEditor: (id?: string) => void;
+  closeTemplateEditor: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -40,4 +46,10 @@ export const useAppStore = create<AppState>((set) => ({
   exerciseDetailId: null,
   viewExerciseDetail: (id) =>
     set({ exerciseDetailId: id, view: "exercise-detail" }),
+
+  templateEditorId: null,
+  viewTemplateEditor: (id) =>
+    set({ templateEditorId: id ?? null, view: "template-editor" }),
+  closeTemplateEditor: () =>
+    set({ templateEditorId: null, view: "templates" }),
 }));

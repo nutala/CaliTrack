@@ -7,6 +7,7 @@ import {
   Plus,
   Trash2,
   Dumbbell,
+  FileText,
   Save,
   Timer,
   Weight,
@@ -32,6 +33,7 @@ import {
   useCreateWorkout,
   useWorkouts,
   useCategoryMeta,
+  useTemplates,
   type NewWorkoutPayload,
 } from "@/hooks/use-data";
 import { useAppStore } from "@/lib/store";
@@ -44,6 +46,7 @@ import {
 } from "@/lib/draft-store";
 import { useTimerStore, REST_PRESETS } from "@/lib/timer-store";
 import { EmptyState, SectionHeading } from "@/components/app/common";
+import { ExercisePickerDialog } from "@/components/app/exercise-picker-dialog";
 
 import {
   Card,
@@ -146,6 +149,9 @@ export function NewWorkoutView() {
 
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [cancelOpen, setCancelOpen] = React.useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = React.useState(false);
+
+  const { data: templates } = useTemplates();
 
   // Resolve exercise objects by id for the draft entries.
   const exerciseMap = React.useMemo(() => {
@@ -180,6 +186,14 @@ export function NewWorkoutView() {
   function addEntry(exercise: ExerciseWithVariants) {
     draft.addEntry(exercise);
     setPickerOpen(false);
+  }
+
+  function handleLoadTemplate(id: string) {
+    const tpl = templates?.find((t) => t.id === id);
+    if (!tpl) return;
+    draft.loadFromTemplate(tpl, exerciseMap);
+    setTemplatePickerOpen(false);
+    toast.success(`Template « ${tpl.name} » chargé`);
   }
 
   // ----- derived totals for the sticky bar -----
@@ -418,10 +432,16 @@ export function NewWorkoutView() {
             )}
           </p>
         </div>
-        <Button onClick={() => setPickerOpen(true)}>
-          <PlusCircle className="h-4 w-4" />
-          Ajouter un exercice
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setTemplatePickerOpen(true)} className="gap-2">
+            <FileText className="h-4 w-4" />
+            Ajouter un template
+          </Button>
+          <Button onClick={() => setPickerOpen(true)}>
+            <PlusCircle className="h-4 w-4" />
+            Ajouter un exercice
+          </Button>
+        </div>
       </div>
 
       {/* ----------------------- Entries list ----------------------- */}
@@ -582,9 +602,70 @@ export function NewWorkoutView() {
       <ExercisePickerDialog
         open={pickerOpen}
         onOpenChange={setPickerOpen}
-        exercises={exercises}
         onPick={addEntry}
       />
+
+      {/* ----------------------- Template picker dialog ----------------------- */}
+      {templatePickerOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setTemplatePickerOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-lg border bg-background p-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-3 text-base font-semibold">Charger un template</h3>
+            {!templates || templates.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aucun template disponible. Crée-en un depuis la page Exercices.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {templates.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => handleLoadTemplate(tpl.id)}
+                    className="w-full rounded-md border border-border/60 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted"
+                  >
+                    <div className="font-medium">{tpl.name}</div>
+                    {tpl.notes && (
+                      <div className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
+                        {tpl.notes}
+                      </div>
+                    )}
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {tpl.entries.slice(0, 5).map((e) => (
+                        <span
+                          key={e.id}
+                          className="inline-block rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                        >
+                          {e.exercise.name}
+                        </span>
+                      ))}
+                      {tpl.entries.length > 5 && (
+                        <span className="text-[10px] text-muted-foreground">
+                          +{tpl.entries.length - 5}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="mt-3 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTemplatePickerOpen(false)}
+              >
+                Fermer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1433,78 +1514,5 @@ function LabeledNumber({
         className="h-9 tabular-nums"
       />
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Exercise picker dialog (Command list grouped by category)
-// ---------------------------------------------------------------------------
-function ExercisePickerDialog({
-  open,
-  onOpenChange,
-  exercises,
-  onPick,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  exercises: ExerciseWithVariants[];
-  onPick: (e: ExerciseWithVariants) => void;
-}) {
-  const getCatMeta = useCategoryMeta();
-  const grouped = React.useMemo(() => {
-    const map = new Map<ExerciseCategory, ExerciseWithVariants[]>();
-    for (const ex of exercises) {
-      const cat = ex.category as ExerciseCategory;
-      const arr = map.get(cat) ?? [];
-      arr.push(ex);
-      map.set(cat, arr);
-    }
-    return Array.from(map.entries()).sort((a, b) =>
-      a[0].localeCompare(b[0]),
-    );
-  }, [exercises]);
-
-  return (
-    <CommandDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Ajouter un exercice"
-      description="Recherche et choisis un exercice à ajouter à ta séance."
-      className="sm:max-w-md"
-    >
-      <Command>
-        <CommandInput placeholder="Rechercher un exercice..." />
-        <CommandList>
-          <CommandEmpty>Aucun exercice trouvé.</CommandEmpty>
-          {grouped.map(([cat, list]) => {
-            const meta = getCatMeta(cat);
-            return (
-              <CommandGroup
-                key={cat}
-                heading={`${meta.emoji} ${meta.label}`}
-              >
-                {list.map((ex) => (
-                  <CommandItem
-                    key={ex.id}
-                    value={`${ex.name} ${cat} ${ex.muscleGroup}`}
-                    onSelect={() => onPick(ex)}
-                  >
-                    <span aria-hidden className="text-base leading-none">
-                      {meta.emoji}
-                    </span>
-                    <span className="flex-1 truncate">{ex.name}</span>
-                    {ex.isStatic && (
-                      <Badge variant="secondary" className="text-[10px]">
-                        Maintien
-                      </Badge>
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            );
-          })}
-        </CommandList>
-      </Command>
-    </CommandDialog>
   );
 }

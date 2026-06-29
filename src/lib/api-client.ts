@@ -74,4 +74,6 @@ export const qk = {
   topExercises: ["stats", "top-exercises"] as const,
   progress: (exerciseId: string, variantId?: string | null) =>
     ["stats", "progress", exerciseId, variantId ?? "any"] as const,
+  templates: ["templates"] as const,
+  template: (id: string) => ["templates", id] as const,
 };

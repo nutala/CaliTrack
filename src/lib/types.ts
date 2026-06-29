@@ -9,6 +9,8 @@ import type {
   WorkoutEntry as PrismaEntry,
   WorkoutSet as PrismaSet,
   Category as PrismaCategory,
+  WorkoutTemplate as PrismaTemplate,
+  WorkoutTemplateEntry as PrismaTemplateEntry,
 } from "@prisma/client";
 
 export type ExerciseCategory = string;
@@ -129,6 +131,24 @@ export interface VariantRecord {
     workoutId: string;
   }[];
 }
+
+/** A single target set inside a WorkoutTemplateEntry. */
+export interface TemplateSetTarget {
+  targetReps?: number;
+  targetHoldSeconds?: number;
+  targetWeightKg?: number;
+  targetRpe?: number;
+}
+
+export type WorkoutTemplate = PrismaTemplate;
+export type WorkoutTemplateEntry = PrismaTemplateEntry;
+
+export type WorkoutTemplateFull = WorkoutTemplate & {
+  entries: (WorkoutTemplateEntry & {
+    exercise: Exercise;
+    variant: ExerciseVariant | null;
+  })[];
+};
 
 export interface ExerciseRecords {
   exercise: {

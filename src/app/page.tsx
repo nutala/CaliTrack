@@ -12,6 +12,8 @@ import { NewWorkoutView } from "@/components/app/views/new-workout-view";
 import { HistoryView } from "@/components/app/views/history-view";
 import { StatsView } from "@/components/app/views/stats-view";
 import { ProfileView } from "@/components/app/views/profile-view";
+import { TemplatesView } from "@/components/app/views/templates-view";
+import { TemplateEditorView } from "@/components/app/views/template-editor-view";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -63,6 +65,10 @@ function ViewRouter({ view }: { view: ReturnType<typeof useAppStore.getState>["v
       return <StatsView />;
     case "profile":
       return <ProfileView />;
+    case "templates":
+      return <TemplatesView />;
+    case "template-editor":
+      return <TemplateEditorView />;
     default:
       return <DashboardView />;
   }

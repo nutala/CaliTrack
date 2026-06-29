@@ -23,6 +23,7 @@ model User {
   exercises  Exercise[]
   workouts   Workout[]
   categories Category[]
+  templates  WorkoutTemplate[]
 }
 
 /// A custom exercise category (Push, Pull, Legs, or user-created ones).
@@ -58,7 +59,8 @@ model Exercise {
 
   user          User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   variants      ExerciseVariant[]
-  workoutEntries WorkoutEntry[]
+  workoutEntries     WorkoutEntry[]
+  templateEntries    WorkoutTemplateEntry[]
 
   @@unique([name, userId])
   @@index([category])
@@ -79,6 +81,7 @@ model ExerciseVariant {
   exercise       Exercise     @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   workoutEntries WorkoutEntry[]
   workoutSets    WorkoutSet[]
+  templateEntries WorkoutTemplateEntry[]
 
   @@unique([exerciseId, name])
   @@index([exerciseId])
@@ -140,4 +143,42 @@ model WorkoutSet {
   variant      ExerciseVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   @@index([workoutEntryId])
+}
+
+/// A reusable workout template. Defines a planned session the user can
+/// load later when starting a real workout.
+model WorkoutTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  notes     String?
+  userId    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries WorkoutTemplateEntry[]
+
+  @@index([userId])
+}
+
+/// A single exercise (with optional variant and target sets) inside a
+/// WorkoutTemplate.  Sets are stored as JSON so we don't need a
+/// third table — they only serve as default values when loading the
+/// template into a real workout.
+model WorkoutTemplateEntry {
+  id            String   @id @default(cuid())
+  templateId    String
+  exerciseId    String
+  variantId     String?
+  supersetGroup Int?
+  position      Int      @default(0)
+  notes         String?
+  sets          Json     @default("[]")
+
+  template WorkoutTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  exercise Exercise         @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  variant  ExerciseVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([templateId])
+  @@index([exerciseId])
 }

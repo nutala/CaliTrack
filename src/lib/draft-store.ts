@@ -8,7 +8,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { format } from "date-fns";
-import type { ExerciseWithVariants, WorkoutFull } from "@/lib/types";
+import type { ExerciseWithVariants, WorkoutFull, WorkoutTemplateFull } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Draft types — transient, never persisted to DB
@@ -110,6 +110,13 @@ interface WorkoutDraftStore extends WorkoutDraft {
   /// objects via the provided lookup map.
   loadFromWorkout: (
     workout: WorkoutFull,
+    exerciseMap: Map<string, ExerciseWithVariants>,
+  ) => void;
+
+  /// Append entries from a template to the current draft. Skips exercises
+  /// that no longer exist in the catalogue.
+  loadFromTemplate: (
+    template: WorkoutTemplateFull,
     exerciseMap: Map<string, ExerciseWithVariants>,
   ) => void;
 }
@@ -267,6 +274,43 @@ export const useDraftStore = create<WorkoutDraftStore>()(
       entries,
       sessionStartedAt: get().sessionStartedAt ?? Date.now(),
     });
+  },
+
+  loadFromTemplate: (template, exerciseMap) => {
+    const newEntries: DraftEntry[] = [];
+    for (const e of template.entries) {
+      const ex = exerciseMap.get(e.exerciseId);
+      if (!ex) continue;
+      const targetSets = (e.sets as Array<{
+        targetReps?: number;
+        targetHoldSeconds?: number;
+        targetWeightKg?: number;
+        targetRpe?: number;
+      }>) ?? [];
+      const sets: DraftSet[] = targetSets.length > 0
+        ? targetSets.map((ts) => ({
+            id: uid(),
+            variantId: e.variantId ?? undefined,
+            reps: ts.targetReps ?? undefined,
+            holdSeconds: ts.targetHoldSeconds ?? undefined,
+            weightKg: ts.targetWeightKg ?? undefined,
+            rpe: ts.targetRpe ?? undefined,
+            validated: false,
+          }))
+        : [{ id: uid(), validated: false, mode: ex.isStatic ? "hold" : "reps" }];
+      newEntries.push({
+        id: uid(),
+        exerciseId: e.exerciseId,
+        variantId: e.variantId ?? null,
+        notes: e.notes ?? "",
+        supersetGroup: e.supersetGroup ?? null,
+        sets,
+      });
+    }
+    set((s) => ({
+      entries: [...s.entries, ...newEntries],
+      sessionStartedAt: s.sessionStartedAt ?? Date.now(),
+    }));
   },
 }),
     {

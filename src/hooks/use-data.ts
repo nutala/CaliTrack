@@ -17,6 +17,7 @@ import type {
   Exercise,
   Category,
   ExerciseRecords,
+  WorkoutTemplateFull,
 } from "@/lib/types";
 import { CATEGORY_META } from "@/lib/types";
 
@@ -389,4 +390,109 @@ export function useCategoryMeta() {
     },
     [dynamicMap],
   );
+}
+
+/** ----- Templates ----- */
+export function useTemplates() {
+  return useQuery<WorkoutTemplateFull[]>({
+    queryKey: qk.templates,
+    queryFn: () => api.get<WorkoutTemplateFull[]>("/api/templates"),
+  });
+}
+
+export function useTemplate(id: string | null) {
+  return useQuery<WorkoutTemplateFull>({
+    queryKey: qk.template(id ?? ""),
+    queryFn: () => api.get<WorkoutTemplateFull>(`/api/templates/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useCreateTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      name: string;
+      notes?: string;
+      entries: {
+        exerciseId: string;
+        variantId?: string | null;
+        supersetGroup?: number | null;
+        notes?: string;
+        sets: {
+          targetReps?: number;
+          targetHoldSeconds?: number;
+          targetWeightKg?: number;
+          targetRpe?: number;
+        }[];
+      }[];
+    }) => api.post<WorkoutTemplateFull>("/api/templates", body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.templates });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useUpdateTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: Record<string, unknown>;
+    }) => api.patch(`/api/templates/${id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.templates });
+      toast.success("Template mis à jour");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useSaveTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      id?: string;
+      name: string;
+      notes?: string;
+      entries: {
+        exerciseId: string;
+        variantId?: string | null;
+        supersetGroup?: number | null;
+        notes?: string;
+        sets: {
+          targetReps?: number;
+          targetHoldSeconds?: number;
+          targetWeightKg?: number;
+          targetRpe?: number;
+        }[];
+      }[];
+    }) => {
+      if (body.id) {
+        return api.put<WorkoutTemplateFull>(`/api/templates/${body.id}`, body);
+      }
+      return api.post<WorkoutTemplateFull>("/api/templates", body);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.templates });
+      toast.success("Template enregistré");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/api/templates/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.templates });
+      toast.success("Template supprimé");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 }

@@ -13,6 +13,7 @@ import {
   Star,
   Target,
   Palette,
+  FileText,
 } from "lucide-react";
 
 import {
@@ -306,6 +307,14 @@ export function ExercisesView() {
             />
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              onClick={() => useAppStore.getState().setView("templates")}
+              variant="outline"
+              className="gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              Templates
+            </Button>
             <Button
               onClick={() => setCategoryDialogOpen(true)}
               variant="outline"
