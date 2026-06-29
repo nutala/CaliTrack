@@ -367,115 +367,24 @@ export function TemplateEditorView() {
                 </CardHeader>
 
                 <CardContent className="space-y-3">
-                  {/* Desktop table header */}
-                  <div className="hidden sm:block">
-                    <div className="mb-1 grid grid-cols-[2rem_1fr_1.5fr_1.5fr_1.5fr_2rem] gap-2 px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      <span />
-                      <span />
-                      <span>Valeur</span>
-                      <span>Poids</span>
-                      <span>RPE</span>
-                      <span />
-                    </div>
-
-                    {entry.sets.map((set, idx) => {
-                      const mode = set.isHold ?? isStatic ? "hold" : "reps";
-                      const otherMode = mode === "reps" ? "hold" : "reps";
-                      const metricValue =
-                        mode === "reps"
-                          ? set.targetReps
-                          : set.targetHoldSeconds;
-                      return (
-                        <div
-                          key={set.id}
-                          className="mb-1 grid grid-cols-[2rem_1fr_1.5fr_1.5fr_1.5fr_2rem] items-center gap-2 rounded-md border border-border/40 px-1 py-1.5"
-                        >
-                          <span className="text-center text-xs font-medium text-muted-foreground tabular-nums">
-                            {idx + 1}
+                  {/* Sets */}
+                  {entry.sets.map((set, idx) => {
+                    const mode = set.isHold ?? (isStatic ? "hold" : "reps");
+                    const otherMode = mode === "reps" ? "hold" : "reps";
+                    const metricValue =
+                      mode === "reps"
+                        ? set.targetReps
+                        : set.targetHoldSeconds;
+                    return (
+                      <div
+                        key={set.id}
+                        className="rounded-lg border border-border/60 bg-muted/20 p-3 transition-colors"
+                      >
+                        {/* Header */}
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground tabular-nums">
+                            Série {idx + 1}
                           </span>
-
-                          {/* Mode toggle */}
-                          <div className="flex items-center gap-1">
-                            {!isStatic && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateSet(entry.id, set.id, {
-                                    isHold: mode !== "hold",
-                                  })
-                                }
-                                className="rounded px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
-                                aria-label={`Passer en ${otherMode === "reps" ? "répétitions" : "maintien (s)"}`}
-                              >
-                                {mode === "reps" ? "Reps" : "Maintien (s)"}
-                              </button>
-                            )}
-                            {isStatic && (
-                              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                                Maintien (s)
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Metric input */}
-                          <Input
-                            type="number"
-                            inputMode="decimal"
-                            placeholder={mode === "hold" ? "30" : "8"}
-                            value={metricValue ?? ""}
-                            onChange={(e) => {
-                              const v =
-                                e.target.value === ""
-                                  ? undefined
-                                  : Number(e.target.value) || undefined;
-                              updateSet(entry.id, set.id, {
-                                ...(mode === "reps"
-                                  ? { targetReps: v, targetHoldSeconds: undefined }
-                                  : { targetHoldSeconds: v, targetReps: undefined }),
-                              });
-                            }}
-                            className="h-7 text-center text-xs tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                          />
-
-                          {/* Weight */}
-                          <Input
-                            type="number"
-                            inputMode="decimal"
-                            placeholder="0"
-                            value={set.targetWeightKg ?? ""}
-                            onChange={(e) => {
-                              const v =
-                                e.target.value === ""
-                                  ? undefined
-                                  : Number(e.target.value) || undefined;
-                              updateSet(entry.id, set.id, {
-                                targetWeightKg: v,
-                              });
-                            }}
-                            className="h-7 text-center text-xs tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                          />
-
-                          {/* RPE */}
-                          <Input
-                            type="number"
-                            inputMode="decimal"
-                            min={1}
-                            max={10}
-                            placeholder="7"
-                            value={set.targetRpe ?? ""}
-                            onChange={(e) => {
-                              const v =
-                                e.target.value === ""
-                                  ? undefined
-                                  : Number(e.target.value) || undefined;
-                              updateSet(entry.id, set.id, {
-                                targetRpe: v,
-                              });
-                            }}
-                            className="h-7 text-center text-xs tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                          />
-
-                          {/* Delete */}
                           <Button
                             size="icon"
                             variant="ghost"
@@ -483,44 +392,14 @@ export function TemplateEditorView() {
                             aria-label={`Supprimer la série ${idx + 1}`}
                             className="h-7 w-7 text-muted-foreground hover:text-destructive"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
-                      );
-                    })}
-                  </div>
 
-                  {/* Mobile layout */}
-                  <div className="space-y-2 sm:hidden">
-                    {entry.sets.map((set, idx) => {
-                      const mode = set.isHold ?? isStatic ? "hold" : "reps";
-                      const otherMode = mode === "reps" ? "hold" : "reps";
-                      const metricValue =
-                        mode === "reps"
-                          ? set.targetReps
-                          : set.targetHoldSeconds;
-                      return (
-                        <div
-                          key={set.id}
-                          className="rounded-md border border-border/40 p-2"
-                        >
-                          <div className="mb-1.5 flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground tabular-nums">
-                              #{idx + 1}
-                            </span>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => removeSet(entry.id, set.id)}
-                              aria-label={`Supprimer la série ${idx + 1}`}
-                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-
-                          {/* Mode toggle */}
-                          <div className="mb-1.5 flex items-center gap-2">
+                        {/* 3-column grid: metric | weight | RPE */}
+                        <div className="grid grid-cols-3 gap-2">
+                          {/* Metric */}
+                          <div className="space-y-1">
                             {!isStatic && (
                               <button
                                 type="button"
@@ -529,20 +408,17 @@ export function TemplateEditorView() {
                                     isHold: mode !== "hold",
                                   })
                                 }
-                                className="rounded px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
+                                className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
+                                aria-label={`Passer en ${otherMode === "reps" ? "répétitions" : "maintien (s)"}`}
                               >
                                 {mode === "reps" ? "Reps" : "Maintien (s)"}
                               </button>
                             )}
                             {isStatic && (
-                              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                                 Maintien (s)
                               </span>
                             )}
-                          </div>
-
-                          {/* Metric */}
-                          <div className="mb-1 flex items-center gap-2">
                             <Input
                               type="number"
                               inputMode="decimal"
@@ -559,8 +435,15 @@ export function TemplateEditorView() {
                                     : { targetHoldSeconds: v, targetReps: undefined }),
                                 });
                               }}
-                              className="h-7 w-20 text-center text-xs tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="h-9 tabular-nums"
                             />
+                          </div>
+
+                          {/* Weight */}
+                          <div className="space-y-1">
+                            <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Poids (kg)
+                            </span>
                             <Input
                               type="number"
                               inputMode="decimal"
@@ -575,14 +458,13 @@ export function TemplateEditorView() {
                                   targetWeightKg: v,
                                 });
                               }}
-                              className="h-7 w-16 text-center text-xs tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="h-9 tabular-nums"
                             />
-                            <span className="text-xs text-muted-foreground">kg</span>
                           </div>
 
                           {/* RPE */}
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-medium uppercase text-muted-foreground">
+                          <div className="space-y-1">
+                            <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                               RPE
                             </span>
                             <Input
@@ -601,52 +483,39 @@ export function TemplateEditorView() {
                                   targetRpe: v,
                                 });
                               }}
-                              className="h-7 w-14 text-center text-xs tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="h-9 tabular-nums"
                             />
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
 
-                  {/* Variant per set */}
-                  {sortedVariants && sortedVariants.length > 0 && (
-                    <div className="pt-1">
-                      <div className="grid grid-cols-[2rem_1fr] gap-2 sm:grid-cols-[2rem_1fr]">
-                        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground" />
-                        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                          Variante par série
-                        </span>
+                        {/* Variant selector */}
+                        {sortedVariants && sortedVariants.length > 0 && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Variante
+                            </span>
+                            <select
+                              value={
+                                set.variantId ?? sortedVariants[0]?.id ?? ""
+                              }
+                              onChange={(e) =>
+                                updateSet(entry.id, set.id, {
+                                  variantId: e.target.value || null,
+                                })
+                              }
+                              className="h-7 min-w-0 flex-1 rounded-md border border-border/60 bg-background px-1.5 text-xs tabular-nums outline-none focus:ring-2 focus:ring-ring"
+                            >
+                              {sortedVariants.map((v) => (
+                                <option key={v.id} value={v.id}>
+                                  {v.name} {difficultyStars(v.difficultyLevel)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </div>
-                      {entry.sets.map((set, idx) => (
-                        <div
-                          key={set.id}
-                          className="mt-1 grid grid-cols-[2rem_1fr] items-center gap-2"
-                        >
-                          <span className="text-center text-xs tabular-nums text-muted-foreground">
-                            {idx + 1}
-                          </span>
-                          <select
-                            value={
-                              set.variantId ?? sortedVariants[0]?.id ?? ""
-                            }
-                            onChange={(e) =>
-                              updateSet(entry.id, set.id, {
-                                variantId: e.target.value || null,
-                              })
-                            }
-                            className="h-7 rounded-md border border-border/60 bg-background px-1.5 text-xs tabular-nums outline-none focus:ring-2 focus:ring-ring"
-                          >
-                            {sortedVariants.map((v) => (
-                              <option key={v.id} value={v.id}>
-                                {v.name} {difficultyStars(v.difficultyLevel)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                    );
+                  })}
 
                   <Button
                     variant="outline"
