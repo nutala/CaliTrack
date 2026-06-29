@@ -5,9 +5,15 @@ import { useEffect, useState } from "react";
 
 interface GravioLogoProps {
   className?: string;
+  showTagline?: boolean;
+  taglineClassName?: string;
 }
 
-export function GravioLogo({ className }: GravioLogoProps) {
+export function GravioLogo({
+  className,
+  showTagline = false,
+  taglineClassName,
+}: GravioLogoProps) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -21,10 +27,19 @@ export function GravioLogo({ className }: GravioLogoProps) {
       : "/logo.png";
 
   return (
-    <img
-      src={src}
-      alt="Gravio"
-      className={className}
-    />
+    <div className="flex flex-col items-center">
+      <img
+        src={src}
+        alt="Gravio"
+        className={className}
+      />
+      {showTagline && (
+        <p
+          className={`mt-1 text-[10px] font-bold tracking-[0.25em] text-muted-foreground ${taglineClassName ?? ""}`}
+        >
+          TRACK. <span className="text-emerald-500">PROGRESS</span>. EVOLVE.
+        </p>
+      )}
+    </div>
   );
 }

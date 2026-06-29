@@ -67,13 +67,29 @@ export function ExercisePickerDialog({
                 {list.map((ex) => (
                   <CommandItem
                     key={ex.id}
-                    value={`${ex.name} ${cat} ${ex.muscleGroup}`}
+                    value={`${ex.name} ${cat} ${ex.muscleGroup} ${(ex as unknown as { tags: string[] }).tags?.join(" ") ?? ""}`}
                     onSelect={() => onPick(ex)}
                   >
                     <span aria-hidden className="text-base leading-none">
                       {meta.emoji}
                     </span>
                     <span className="flex-1 truncate">{ex.name}</span>
+                    {(ex as unknown as { tags: string[] }).tags?.map((tag) => {
+                      const tagMeta = getCatMeta(tag);
+                      return (
+                        <Badge
+                          key={tag}
+                          variant="outline"
+                          className="gap-1 text-[9px] font-medium leading-tight"
+                          style={{
+                            borderColor: `${tagMeta.color}44`,
+                            color: tagMeta.color,
+                          }}
+                        >
+                          {tagMeta.emoji} {tagMeta.label}
+                        </Badge>
+                      );
+                    })}
                     {ex.isStatic && (
                       <Badge variant="secondary" className="text-[10px]">
                         Maintien

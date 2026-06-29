@@ -39,7 +39,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="flex items-center gap-2.5 group"
             aria-label="Aller au tableau de bord"
           >
-            <GravioLogo className="h-20 w-auto object-contain transition-transform group-hover:scale-105" />
+            <GravioLogo
+              className="h-20 w-auto object-contain transition-transform group-hover:scale-105"
+              showTagline
+            />
           </button>
 
           {/* Desktop nav */}
