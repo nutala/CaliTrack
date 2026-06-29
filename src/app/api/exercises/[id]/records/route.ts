@@ -200,6 +200,84 @@ export async function GET(_req: Request, { params }: Params) {
     };
   });
 
+  // If no variants exist but there are entries, build a single record for the exercise itself
+  if (variantRecords.length === 0 && entries.length > 0) {
+    const allSets = entries.flatMap((e) =>
+      e.sets.map((s) => ({
+        ...s,
+        workoutDate: e.workout.date,
+        workoutId: e.workoutId,
+      })),
+    );
+
+    if (allSets.length > 0) {
+      const metric = (s: (typeof allSets)[number]) => s.reps ?? s.holdSeconds ?? 0;
+      const bestSet = allSets.reduce((a, b) => (metric(a) >= metric(b) ? a : b));
+
+      const byWeight = new Map<number, (typeof allSets)[number]>();
+      for (const s of allSets) {
+        const w = s.weightKg ?? 0;
+        const existing = byWeight.get(w);
+        if (!existing || metric(s) > metric(existing)) byWeight.set(w, s);
+      }
+      const bestByWeight = Array.from(byWeight.entries())
+        .map(([weight, s]) => ({
+          value: metric(s), unit, weightKg: s.weightKg, rpe: s.rpe,
+          date: format(s.workoutDate, "yyyy-MM-dd"), workoutId: s.workoutId,
+        }))
+        .sort((a, b) => b.value - a.value || (b.weightKg ?? 0) - (a.weightKg ?? 0));
+
+      const recentPerfs = entries.slice(0, 5).map((e) => {
+        const bestInEntry = e.sets.reduce((a, b) => {
+          const mA = a.reps ?? a.holdSeconds ?? 0;
+          const mB = b.reps ?? b.holdSeconds ?? 0;
+          return mA >= mB ? a : b;
+        });
+        return {
+          value: metric(bestInEntry), unit,
+          weightKg: bestInEntry.weightKg, rpe: bestInEntry.rpe,
+          date: format(e.workout.date, "yyyy-MM-dd"), workoutId: e.workoutId,
+        };
+      });
+
+      const entriesAsc = [...entries].sort((a, b) => a.workout.date.getTime() - b.workout.date.getTime());
+      let previousBest = -1;
+      const prHistory: typeof recentPerfs = [];
+      for (const e of entriesAsc) {
+        const entryBest = e.sets.reduce((a, b) => {
+          const mA = a.reps ?? a.holdSeconds ?? 0;
+          const mB = b.reps ?? b.holdSeconds ?? 0;
+          return mA >= mB ? a : b;
+        });
+        const entryVal = metric(entryBest);
+        if (entryVal > previousBest) {
+          previousBest = entryVal;
+          prHistory.push({
+            value: entryVal, unit,
+            weightKg: entryBest.weightKg, rpe: entryBest.rpe,
+            date: format(e.workout.date, "yyyy-MM-dd"), workoutId: e.workoutId,
+          });
+        }
+      }
+
+      variantRecords.push({
+        variantId: `__no-variant__`,
+        variantName: exercise.name,
+        targetValue: null,
+        difficultyLevel: 0,
+        allTimeBest: {
+          value: metric(bestSet), unit,
+          weightKg: bestSet.weightKg, rpe: bestSet.rpe,
+          date: format(bestSet.workoutDate, "yyyy-MM-dd"),
+          workoutId: bestSet.workoutId,
+        },
+        bestByWeight,
+        recentPerformances: recentPerfs,
+        prHistory: prHistory.reverse(),
+      });
+    }
+  }
+
   const response: ExerciseRecords = {
     exercise: {
       id: exercise.id,
