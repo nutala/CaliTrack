@@ -1270,7 +1270,7 @@ function SetRowDesktop({
           <select
             value={set.variantId ?? variants[0]?.id}
             onChange={(e) => onVariantChange(e.target.value)}
-            className="h-9 w-20 rounded-md border border-border/60 bg-background px-1.5 text-xs tabular-nums text-foreground outline-none focus:ring-2 focus:ring-ring"
+            className="h-9 w-36 rounded-md border border-border/60 bg-background px-1.5 text-xs tabular-nums text-foreground outline-none focus:ring-2 focus:ring-ring"
             aria-label={`Variante pour la série ${idx + 1}`}
           >
             {variants.map((v) => (
