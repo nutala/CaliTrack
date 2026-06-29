@@ -37,7 +37,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
 ];
 
 function CaliLogo({ className }: { className?: string }) {
-  return <GravioLogo className={`h-10 w-10 rounded-xl ${className ?? ""}`.trim()} showTagline taglineClassName="text-[7px]" />;
+  return <GravioLogo className={`h-10 w-10 rounded-xl ${className ?? ""}`.trim()} />;
 }
 
 function GoogleLogo({ className }: { className?: string }) {

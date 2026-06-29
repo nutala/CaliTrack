@@ -37,7 +37,7 @@ export function GravioLogo({
         <p
           className={`mt-1 text-[10px] font-bold tracking-[0.25em] text-muted-foreground ${taglineClassName ?? ""}`}
         >
-          TRACK. <span className="text-emerald-500">PROGRESS</span>. EVOLVE.
+          TRACK. <span style={{ color: "#C5DD48" }}>PROGRESS</span>. EVOLVE.
         </p>
       )}
     </div>
