@@ -50,6 +50,7 @@ export async function POST(req: Request) {
       data: {
         name: nameTrimmed,
         category: body.category ?? "Push",
+        tags: body.tags ?? [],
         muscleGroup: body.muscleGroup ?? "Full body",
         isStatic: Boolean(body.isStatic),
         description: body.description ?? null,

@@ -85,6 +85,7 @@ import { useAppStore } from "@/lib/store";
 interface ExerciseFormState {
   name: string;
   category: ExerciseCategory;
+  tags: string[];
   muscleGroup: string;
   isStatic: boolean;
   description: string;
@@ -101,6 +102,7 @@ interface VariantFormState {
 const EMPTY_EXERCISE_FORM: ExerciseFormState = {
   name: "",
   category: "Push",
+  tags: [],
   muscleGroup: "Corps complet",
   isStatic: false,
   description: "",
@@ -174,8 +176,11 @@ export function ExercisesView() {
     return exercises.filter((ex) => {
       const matchesSearch =
         !q || ex.name.toLowerCase().includes(q) || (ex.muscleGroup ?? "").toLowerCase().includes(q);
+      const exTags = (ex as unknown as { tags: string[] }).tags ?? [];
       const matchesCategory =
-        activeCategories.size === 0 || activeCategories.has(ex.category as ExerciseCategory);
+        activeCategories.size === 0 ||
+        activeCategories.has(ex.category as ExerciseCategory) ||
+        exTags.some((t) => activeCategories.has(t as ExerciseCategory));
       return matchesSearch && matchesCategory;
     });
   }, [exercises, search, activeCategories]);
@@ -217,6 +222,7 @@ export function ExercisesView() {
     const payload = {
       name: form.name.trim(),
       category: form.category,
+      tags: form.tags,
       muscleGroup: form.muscleGroup.trim() || "Corps complet",
       isStatic: form.isStatic,
       description: form.description.trim() ? form.description.trim() : null,
@@ -578,13 +584,29 @@ function ExerciseCard({
             {exercise.equipment ? ` · ${exercise.equipment}` : ""}
           </p>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Badge
             className="border-transparent text-[10px]"
             style={{ backgroundColor: meta.color, color: "white" }}
           >
             {meta.label}
           </Badge>
+          {(exercise as unknown as { tags: string[] }).tags?.map((tag) => {
+            const tagMeta = getCatMeta(tag);
+            return (
+              <Badge
+                key={tag}
+                variant="outline"
+                className="gap-1 text-[9px] font-medium leading-tight"
+                style={{
+                  borderColor: `${tagMeta.color}44`,
+                  color: tagMeta.color,
+                }}
+              >
+                {tagMeta.emoji} {tagMeta.label}
+              </Badge>
+            );
+          })}
           <Badge
             variant="outline"
             className="gap-1 text-[10px] font-medium text-muted-foreground"
@@ -784,6 +806,7 @@ function ExerciseFormDialog({
       setForm({
         name: editing.name,
         category: (editing.category as ExerciseCategory) ?? "Push",
+        tags: (editing as unknown as { tags: string[] }).tags ?? [],
         muscleGroup: editing.muscleGroup ?? "Corps complet",
         isStatic: editing.isStatic,
         description: editing.description ?? "",
@@ -890,6 +913,43 @@ function ExerciseFormDialog({
               onChange={(e) => update("equipment", e.target.value)}
               placeholder="ex. Paralettes, Anneaux, Mur"
             />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label>Catégories secondaires</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {categories
+                .filter((cat) => cat !== form.category)
+                .map((cat) => {
+                  const meta = getCatMeta(cat);
+                  const selected = form.tags.includes(cat);
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() =>
+                        update(
+                          "tags",
+                          selected
+                            ? form.tags.filter((t) => t !== cat)
+                            : [...form.tags, cat],
+                        )
+                      }
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                        selected
+                          ? "border-foreground/40 bg-foreground/10 text-foreground"
+                          : "border-border/60 text-muted-foreground hover:border-muted-foreground/40",
+                      )}
+                    >
+                      {meta.emoji} {meta.label}
+                    </button>
+                  );
+                })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Catégories additionnelles pour retrouver cet exercice dans les filtres.
+            </p>
           </div>
 
           <div className="flex flex-col gap-2">

@@ -49,6 +49,7 @@ model Exercise {
   id          String   @id @default(cuid())
   name        String
   category    String   @default("Push")
+  tags        Json     @default("[]")
   muscleGroup String   @default("Full body")
   isStatic    Boolean  @default(false)
   description String?

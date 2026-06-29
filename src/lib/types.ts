@@ -30,7 +30,7 @@ export const CATEGORY_META: Record<
 
 export type Category = PrismaCategory;
 
-export type Exercise = PrismaExercise;
+export type Exercise = Omit<PrismaExercise, 'tags'> & { tags: string[] };
 export type ExerciseVariant = PrismaVariant;
 export type Workout = PrismaWorkout;
 export type WorkoutEntry = PrismaEntry;

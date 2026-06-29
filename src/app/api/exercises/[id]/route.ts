@@ -16,6 +16,7 @@ export async function PATCH(req: Request, { params }: Params) {
       data: {
         ...(body.name !== undefined ? { name: String(body.name).trim() } : {}),
         ...(body.category !== undefined ? { category: body.category } : {}),
+        ...(body.tags !== undefined ? { tags: body.tags } : {}),
         ...(body.muscleGroup !== undefined
           ? { muscleGroup: body.muscleGroup }
           : {}),
