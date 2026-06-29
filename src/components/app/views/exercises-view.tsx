@@ -684,7 +684,7 @@ function ExerciseCard({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        onClick={() => onEditVariant(v)}
+                        onClick={(e) => { e.stopPropagation(); onEditVariant(v); }}
                         aria-label="Modifier la variante"
                       >
                         <Pencil className="h-3.5 w-3.5" />
@@ -693,7 +693,7 @@ function ExerciseCard({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={() => onDeleteVariant(v)}
+                        onClick={(e) => { e.stopPropagation(); onDeleteVariant(v); }}
                         aria-label="Supprimer la variante"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -718,7 +718,7 @@ function ExerciseCard({
             variant="ghost"
             size="sm"
             className="h-8 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
-            onClick={onAddVariant}
+            onClick={(e) => { e.stopPropagation(); onAddVariant(); }}
           >
             <Plus className="h-3.5 w-3.5" />
             Ajouter une variante
