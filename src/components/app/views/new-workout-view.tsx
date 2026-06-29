@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api-client";
 import {
   type ExerciseWithVariants,
   type ExerciseCategory,
@@ -697,6 +698,31 @@ function SessionTimer({ startedAt }: { startedAt: number }) {
   );
 }
 
+/** Fetch the last performed set values for a given exercise+variant. */
+async function fetchLastSet(
+  exerciseId: string,
+  variantId: string,
+): Promise<Partial<DraftSet> | null> {
+  try {
+    const params = new URLSearchParams({ exerciseId, variantId });
+    const data = await api.get<{
+      reps: number | null;
+      holdSeconds: number | null;
+      weightKg: number | null;
+      rpe: number | null;
+    } | null>(`/api/sets/last?${params}`);
+    if (!data) return null;
+    return {
+      reps: data.reps ?? undefined,
+      holdSeconds: data.holdSeconds ?? undefined,
+      weightKg: data.weightKg ?? undefined,
+      rpe: data.rpe ?? undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // EntryCard — one exercise with its sets
 // ---------------------------------------------------------------------------
@@ -769,13 +795,25 @@ function EntryCard({
   const ssLabel = supersetLabel(supersetGroup);
   const inSuperset = supersetGroup != null;
 
-  function handleAddSet() {
+  async function handleAddSet() {
     const lastSet = sets[sets.length - 1];
     const defaults: Partial<DraftSet> = {};
-    if (lastSet?.variantId) defaults.variantId = lastSet.variantId;
-    else if (sortedVariants.length > 0) defaults.variantId = sortedVariants[0].id;
+    const variantId = lastSet?.variantId ?? (sortedVariants.length > 0 ? sortedVariants[0].id : undefined);
+    if (variantId) defaults.variantId = variantId;
     if (lastSet?.mode) defaults.mode = lastSet.mode;
+    const last = variantId ? await fetchLastSet(exercise.id, variantId) : null;
+    if (last) {
+      defaults.reps = last.reps;
+      defaults.holdSeconds = last.holdSeconds;
+      defaults.weightKg = last.weightKg;
+      defaults.rpe = last.rpe;
+    }
     onAddSet(defaults);
+  }
+
+  async function handleVariantChange(setId: string, newVariantId: string) {
+    const last = await fetchLastSet(exercise.id, newVariantId);
+    onUpdateSet(setId, { variantId: newVariantId, ...last });
   }
 
   return (
@@ -945,6 +983,7 @@ function EntryCard({
                   onUpdate={(patch) => onUpdateSet(set.id, patch)}
                   onRemove={() => onRemoveSet(set.id)}
                   onValidate={(v) => onValidateSet(set.id, v)}
+                  onVariantChange={(vid) => handleVariantChange(set.id, vid)}
                 />
               ))}
               {sets.length === 0 && (
@@ -975,6 +1014,7 @@ function EntryCard({
               onUpdate={(patch) => onUpdateSet(set.id, patch)}
               onRemove={() => onRemoveSet(set.id)}
               onValidate={(v) => onValidateSet(set.id, v)}
+              onVariantChange={(vid) => handleVariantChange(set.id, vid)}
             />
           ))}
           {sets.length === 0 && (
@@ -1163,6 +1203,7 @@ function SetRowDesktop({
   onUpdate,
   onRemove,
   onValidate,
+  onVariantChange,
 }: {
   set: DraftSet;
   idx: number;
@@ -1173,6 +1214,7 @@ function SetRowDesktop({
   onUpdate: (patch: Partial<DraftSet>) => void;
   onRemove: () => void;
   onValidate: (validated: boolean) => void;
+  onVariantChange: (variantId: string) => void;
 }) {
   const validated = set.validated;
   const mode = set.mode ?? (isStatic ? "hold" : "reps");
@@ -1211,7 +1253,7 @@ function SetRowDesktop({
         {variants.length > 0 && (
           <select
             value={set.variantId ?? variants[0]?.id}
-            onChange={(e) => onUpdate({ variantId: e.target.value })}
+            onChange={(e) => onVariantChange(e.target.value)}
             className="h-9 w-20 rounded-md border border-border/60 bg-background px-1.5 text-xs tabular-nums text-foreground outline-none focus:ring-2 focus:ring-ring"
             aria-label={`Variante pour la série ${idx + 1}`}
           >
@@ -1287,6 +1329,7 @@ function SetRowMobile({
   onUpdate,
   onRemove,
   onValidate,
+  onVariantChange,
 }: {
   set: DraftSet;
   idx: number;
@@ -1297,6 +1340,7 @@ function SetRowMobile({
   onUpdate: (patch: Partial<DraftSet>) => void;
   onRemove: () => void;
   onValidate: (validated: boolean) => void;
+  onVariantChange: (variantId: string) => void;
 }) {
   const validated = set.validated;
   const mode = set.mode ?? (isStatic ? "hold" : "reps");
@@ -1402,7 +1446,7 @@ function SetRowMobile({
           </span>
           <select
             value={set.variantId ?? variants[0]?.id}
-            onChange={(e) => onUpdate({ variantId: e.target.value })}
+            onChange={(e) => onVariantChange(e.target.value)}
             className="h-7 min-w-0 flex-1 rounded-md border border-border/60 bg-background px-1.5 text-xs tabular-nums text-foreground outline-none focus:ring-2 focus:ring-ring"
           >
             {variants.map((v) => (
