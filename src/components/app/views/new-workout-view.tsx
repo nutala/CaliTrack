@@ -187,6 +187,22 @@ export function NewWorkoutView() {
   function addEntry(exercise: ExerciseWithVariants) {
     draft.addEntry(exercise);
     setPickerOpen(false);
+
+    const entries = useDraftStore.getState().entries;
+    const newEntry = entries[entries.length - 1];
+    if (!newEntry?.sets[0]) return;
+
+    const firstVariant = exercise.variants
+      ?.slice()
+      .sort((a, b) => a.difficultyLevel - b.difficultyLevel)[0];
+    if (!firstVariant) return;
+
+    fetchLastSet(exercise.id, firstVariant.id).then((last) => {
+      draft.updateSet(newEntry.id, newEntry.sets[0].id, {
+        variantId: firstVariant.id,
+        ...(last ?? {}),
+      });
+    });
   }
 
   function handleLoadTemplate(id: string) {
