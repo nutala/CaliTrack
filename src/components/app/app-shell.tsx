@@ -40,8 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label="Aller au tableau de bord"
           >
             <GravioLogo
-              className="h-14 w-auto object-contain transition-transform group-hover:scale-105"
-              showTagline
+              className="h-20 w-auto object-contain transition-transform group-hover:scale-105"
             />
           </button>
 
