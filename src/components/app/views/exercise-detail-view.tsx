@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ArrowLeft, Trophy, Calendar, Weight, Gauge, History, BarChart3, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
+import { fmtDate } from "@/lib/calc";
 import { useAppStore } from "@/lib/store";
 import { useExerciseRecords } from "@/hooks/use-data";
 import { useCategoryMeta } from "@/hooks/use-data";
@@ -148,7 +149,7 @@ function VariantRecordCard({ record }: { record: VariantRecord }) {
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       {bw.rpe != null && <span>RPE {bw.rpe}</span>}
-                      <span className="tabular-nums">{bw.date}</span>
+                      <span className="tabular-nums">{fmtDate(bw.date, "dd-MM-yyyy")}</span>
                     </div>
                   </button>
                 ))}
@@ -194,7 +195,7 @@ function VariantRecordCard({ record }: { record: VariantRecord }) {
                         </span>
                       )}
                     </div>
-                    <span className="text-muted-foreground">{pr.date}</span>
+                    <span className="text-muted-foreground">{fmtDate(pr.date, "dd-MM-yyyy")}</span>
                   </button>
                 ))}
               </div>
@@ -218,7 +219,7 @@ function VariantRecordCard({ record }: { record: VariantRecord }) {
                   >
                     <div className="flex items-center gap-3 tabular-nums">
                       <span className="font-medium text-foreground">
-                        {p.value}
+                        {p.value} {p.unit}
                       </span>
                       {p.weightKg != null && (
                         <span className="text-muted-foreground">
@@ -231,7 +232,7 @@ function VariantRecordCard({ record }: { record: VariantRecord }) {
                         </span>
                       )}
                     </div>
-                    <span className="text-muted-foreground">{p.date}</span>
+                    <span className="text-muted-foreground">{fmtDate(p.date, "dd-MM-yyyy")}</span>
                   </button>
                 ))}
               </div>

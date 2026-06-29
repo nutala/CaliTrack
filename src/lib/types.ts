@@ -117,6 +117,7 @@ export interface VariantRecord {
   }[];
   recentPerformances: {
     value: number;
+    unit: string;
     weightKg: number | null;
     rpe: number | null;
     date: string;

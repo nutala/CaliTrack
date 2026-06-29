@@ -145,6 +145,7 @@ export async function GET(_req: Request, { params }: Params) {
         });
         return {
           value: metric(bestInEntry),
+          unit,
           weightKg: bestInEntry.weightKg,
           rpe: bestInEntry.rpe,
           date: format(e.workout.date, "yyyy-MM-dd"),
@@ -171,6 +172,7 @@ export async function GET(_req: Request, { params }: Params) {
         previousBest = entryVal;
         prHistory.push({
           value: entryVal,
+          unit,
           weightKg: entryBest.weightKg,
           rpe: entryBest.rpe,
           date: format(e.workout.date, "yyyy-MM-dd"),
