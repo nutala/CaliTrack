@@ -730,7 +730,7 @@ function EntryCard({
             </Badge>
             {isStatic && (
               <Badge variant="secondary" className="text-[10px]">
-                Maintien
+                Maintien (s)
               </Badge>
             )}
             {inSuperset && ssColor && ssLabel && (
@@ -1120,9 +1120,9 @@ function SetRowDesktop({
             variant="ghost"
             className="h-9 px-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
             onClick={() => onUpdate({ mode: otherMode })}
-            aria-label={`Passer en ${otherMode === "reps" ? "répétitions" : "maintien"}`}
+            aria-label={`Passer en ${otherMode === "reps" ? "répétitions" : "maintien (s)"}`}
           >
-            {mode === "reps" ? "Reps" : "Maintien"}
+            {mode === "reps" ? "Reps" : "Maintien (s)"}
           </Button>
         </div>
       </td>
@@ -1256,9 +1256,9 @@ function SetRowMobile({
               type="button"
               onClick={() => onUpdate({ mode: otherMode })}
               className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
-              aria-label={`Passer en ${otherMode === "reps" ? "répétitions" : "maintien"}`}
+              aria-label={`Passer en ${otherMode === "reps" ? "répétitions" : "maintien (s)"}`}
             >
-              {mode === "reps" ? "Reps" : "Maintien"}
+              {mode === "reps" ? "Reps" : "Maintien (s)"}
             </button>
           <Input
             type="number"
