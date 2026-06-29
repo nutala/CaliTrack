@@ -1265,8 +1265,8 @@ function SetRowDesktop({
           </Button>
         </div>
       </td>
-      <td className="py-2 pr-2">
-        {variants.length > 0 && (
+      {variants.length > 0 && (
+        <td className="py-2 pr-2">
           <select
             value={set.variantId ?? variants[0]?.id}
             onChange={(e) => onVariantChange(e.target.value)}
@@ -1279,8 +1279,8 @@ function SetRowDesktop({
               </option>
             ))}
           </select>
-        )}
-      </td>
+        </td>
+      )}
       <td className="py-2 pr-2">
         <div className="flex items-center gap-0.5">
           <NumberInput
