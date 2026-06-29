@@ -306,7 +306,7 @@ export function ExercisesView() {
               aria-label="Rechercher un exercice"
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
             <Button
               onClick={() => useAppStore.getState().setView("templates")}
               variant="outline"

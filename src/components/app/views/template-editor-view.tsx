@@ -369,7 +369,8 @@ export function TemplateEditorView() {
                 <CardContent className="space-y-3">
                   {/* Sets */}
                   {entry.sets.map((set, idx) => {
-                    const mode = set.isHold ?? (isStatic ? "hold" : "reps");
+                    const isHold = set.isHold ?? isStatic;
+                    const mode = isHold ? "hold" : "reps";
                     const otherMode = mode === "reps" ? "hold" : "reps";
                     const metricValue =
                       mode === "reps"
