@@ -465,6 +465,8 @@ export function useSaveTemplate() {
         supersetGroup?: number | null;
         notes?: string;
         sets: {
+          isHold?: boolean;
+          variantId?: string | null;
           targetReps?: number;
           targetHoldSeconds?: number;
           targetWeightKg?: number;

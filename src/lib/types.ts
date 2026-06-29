@@ -134,6 +134,8 @@ export interface VariantRecord {
 
 /** A single target set inside a WorkoutTemplateEntry. */
 export interface TemplateSetTarget {
+  isHold?: boolean;
+  variantId?: string | null;
   targetReps?: number;
   targetHoldSeconds?: number;
   targetWeightKg?: number;

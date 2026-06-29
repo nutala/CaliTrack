@@ -282,6 +282,8 @@ export const useDraftStore = create<WorkoutDraftStore>()(
       const ex = exerciseMap.get(e.exerciseId);
       if (!ex) continue;
       const targetSets = (e.sets as Array<{
+        isHold?: boolean;
+        variantId?: string | null;
         targetReps?: number;
         targetHoldSeconds?: number;
         targetWeightKg?: number;
@@ -290,7 +292,8 @@ export const useDraftStore = create<WorkoutDraftStore>()(
       const sets: DraftSet[] = targetSets.length > 0
         ? targetSets.map((ts) => ({
             id: uid(),
-            variantId: e.variantId ?? undefined,
+            variantId: ts.variantId ?? undefined,
+            mode: ts.isHold ? "hold" : "reps",
             reps: ts.targetReps ?? undefined,
             holdSeconds: ts.targetHoldSeconds ?? undefined,
             weightKg: ts.targetWeightKg ?? undefined,
@@ -301,7 +304,7 @@ export const useDraftStore = create<WorkoutDraftStore>()(
       newEntries.push({
         id: uid(),
         exerciseId: e.exerciseId,
-        variantId: e.variantId ?? null,
+        variantId: null,
         notes: e.notes ?? "",
         supersetGroup: e.supersetGroup ?? null,
         sets,
