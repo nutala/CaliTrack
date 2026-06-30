@@ -76,6 +76,51 @@ export async function GET(_req: Request, { params }: Params) {
     orderBy: { workout: { date: "desc" } },
   });
 
+  // Also fetch combo entries and inject synthetic entries for steps
+  // matching this exercise, so PRs are computed from combos too.
+  const comboEntries = await db.workoutEntry.findMany({
+    where: {
+      exercise: { name: "Combos" },
+      workout: userId ? { userId } : { userId: null },
+    },
+    include: { workout: true },
+    orderBy: { workout: { date: "desc" } },
+  });
+  for (const ce of comboEntries) {
+    const rawSteps = (ce as unknown as { comboSteps: unknown }).comboSteps;
+    if (!Array.isArray(rawSteps)) continue;
+    const steps = rawSteps as Array<Record<string, unknown>>;
+    const matchingSteps = steps.filter((s) => s.exerciseId === id);
+    if (matchingSteps.length === 0) continue;
+    (entries as unknown as Array<Record<string, unknown>>).push({
+      id: ce.id,
+      workoutId: ce.workoutId,
+      exerciseId: id,
+      variantId: (matchingSteps[0].variantId as string) ?? null,
+      supersetGroup: null,
+      position: 0,
+      notes: null,
+      comboSteps: [],
+      comboWeightKg: null,
+      comboRpe: null,
+      createdAt: ce.createdAt,
+      workout: ce.workout,
+      variant: null,
+      sets: matchingSteps.map((s: Record<string, unknown>, i: number) => ({
+        id: `${ce.id}-${i}`,
+        workoutEntryId: ce.id,
+        setNumber: i + 1,
+        variantId: (s.variantId as string) ?? null,
+        reps: (s.reps as number) ?? null,
+        holdSeconds: (s.holdSeconds as number) ?? null,
+        weightKg: (s.weightKg as number) ?? null,
+        rpe: (s.rpe as number) ?? null,
+        createdAt: ce.createdAt,
+        variant: null,
+      })),
+    });
+  }
+
   const unit = exercise.isStatic ? "s" : "reps";
 
   const variantRecords: VariantRecord[] = variants.map((v) => {
