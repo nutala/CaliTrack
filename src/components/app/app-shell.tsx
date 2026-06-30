@@ -57,7 +57,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   onClick={() => setView(item.id)}
                   className={cn(
                     "gap-2 font-medium",
-                    active && "shadow-sm",
+                    active && item.id === "new-workout"
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
+                      : active && "shadow-sm",
                   )}
                   aria-current={active ? "page" : undefined}
                 >
@@ -69,14 +71,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-1">
-            <Button
-              size="sm"
-              onClick={() => setView("new-workout")}
-              className="hidden sm:inline-flex gap-2"
-            >
-              <PlusCircle className="h-4 w-4" />
-              Nouvelle séance
-            </Button>
             <ThemeToggle />
             <UserMenu />
           </div>
