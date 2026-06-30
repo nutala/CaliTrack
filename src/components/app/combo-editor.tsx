@@ -63,6 +63,10 @@ export function ComboEditor({
   }, [exercises]);
 
   function handlePickExercise(ex: ExerciseWithVariants) {
+    const sortedVariants = ex.variants
+      ? ex.variants.slice().sort((a, b) => a.difficultyLevel - b.difficultyLevel)
+      : [];
+    const firstVariant = sortedVariants[0];
     const newStep: ComboStep = {
       id: uid(),
       exerciseId: ex.id,
@@ -70,6 +74,8 @@ export function ComboEditor({
       category: ex.category,
       isStatic: ex.isStatic,
       mode: ex.isStatic ? "hold" : "reps",
+      variantId: firstVariant?.id ?? null,
+      variantName: firstVariant?.name ?? null,
     };
     onAddStep(newStep);
     setPickerOpen(false);

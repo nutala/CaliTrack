@@ -481,7 +481,13 @@ export function NewWorkoutView() {
                 onRemoveComboStep={(stepId) => draft.removeComboStep(entry.id, stepId)}
                 onUpdateComboStep={(stepId, patch) => draft.updateComboStep(entry.id, stepId, patch)}
                 onReorderComboStep={(stepId, dir) => draft.reorderComboStep(entry.id, stepId, dir)}
-                onToggleComboValidated={() => draft.toggleComboValidated(entry.id)}
+                onToggleComboValidated={() => {
+                  const validating = !entry.comboValidated;
+                  entry.comboSteps.forEach((step) => {
+                    draft.updateComboStep(entry.id, step.id, { done: validating, failed: false });
+                  });
+                  draft.toggleComboValidated(entry.id);
+                }}
                 onComboWeightKgChange={(v) => draft.updateEntry(entry.id, { comboWeightKg: v })}
                 onComboRpeChange={(v) => draft.updateEntry(entry.id, { comboRpe: v })}
               />
