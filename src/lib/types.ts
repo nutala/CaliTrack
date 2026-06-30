@@ -26,6 +26,7 @@ export const CATEGORY_META: Record<
   Static: { label: "Static", color: "#06b6d4", emoji: "⚖️" },
   Skill: { label: "Skill", color: "#ec4899", emoji: "🎯" },
   Mobility: { label: "Mobility", color: "#84cc16", emoji: "🤸" },
+  Combo: { label: "Combos", color: "#f97316", emoji: "🔗" },
 };
 
 export type Category = PrismaCategory;
@@ -152,6 +153,20 @@ export type WorkoutTemplateFull = WorkoutTemplate & {
     variant: ExerciseVariant | null;
   })[];
 };
+
+export interface ComboStep {
+  id: string;
+  exerciseId: string;
+  exerciseName: string;
+  category: string;
+  isStatic: boolean;
+  variantId?: string | null;
+  variantName?: string | null;
+  mode: "reps" | "hold";
+  reps?: number;
+  holdSeconds?: number;
+  failed?: boolean;
+}
 
 export interface ExerciseRecords {
   exercise: {

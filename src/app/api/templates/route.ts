@@ -37,6 +37,14 @@ export interface CreateTemplateBody {
       targetWeightKg?: number;
       targetRpe?: number;
     }[];
+    comboSteps?: {
+      id: string;
+      exerciseId: string;
+      variantId?: string | null;
+      mode?: string;
+      reps?: number;
+      holdSeconds?: number;
+    }[];
   }[];
 }
 
@@ -74,6 +82,7 @@ export async function POST(req: Request) {
             position: i + 1,
             notes: e.notes ?? null,
             sets: Array.isArray(e.sets) ? e.sets : [],
+            comboSteps: Array.isArray(e.comboSteps) ? e.comboSteps : [],
           },
         });
       }

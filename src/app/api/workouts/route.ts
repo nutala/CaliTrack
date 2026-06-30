@@ -38,7 +38,8 @@ export async function POST(req: Request) {
     if (typeof e.exerciseId !== "string") {
       return NextResponse.json({ error: "Chaque entrée a besoin d'un exerciseId" }, { status: 400 });
     }
-    if (!Array.isArray(e.sets) || e.sets.length === 0) {
+    const isCombo = Array.isArray(e.comboSteps) && e.comboSteps.length > 0;
+    if (!isCombo && (!Array.isArray(e.sets) || e.sets.length === 0)) {
       return NextResponse.json({ error: "Chaque entrée a besoin d'au moins une série" }, { status: 400 });
     }
   }
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
 
       for (let i = 0; i < body.entries.length; i++) {
         const e = body.entries[i];
+        const isCombo = Array.isArray(e.comboSteps) && e.comboSteps.length > 0;
         const entry = await tx.workoutEntry.create({
           data: {
             workoutId: workout.id,
@@ -67,21 +69,26 @@ export async function POST(req: Request) {
             supersetGroup: typeof e.supersetGroup === "number" ? e.supersetGroup : null,
             position: i + 1,
             notes: e.notes ?? null,
+            comboSteps: isCombo ? e.comboSteps : [],
+            comboWeightKg: isCombo ? (e.weightKg ?? null) : null,
+            comboRpe: isCombo ? (e.rpe ?? null) : null,
           },
         });
-        await tx.workoutSet.createMany({
-          data: e.sets.map(
-            (s: { variantId?: string | null; reps?: number; holdSeconds?: number; weightKg?: number; rpe?: number }, j: number) => ({
-              workoutEntryId: entry.id,
-              setNumber: j + 1,
-              variantId: s.variantId || null,
-              reps: s.reps ?? null,
-              holdSeconds: s.holdSeconds ?? null,
-              weightKg: s.weightKg ?? null,
-              rpe: s.rpe ?? null,
-            }),
-          ),
-        });
+        if (!isCombo) {
+          await tx.workoutSet.createMany({
+            data: e.sets.map(
+              (s: { variantId?: string | null; reps?: number; holdSeconds?: number; weightKg?: number; rpe?: number }, j: number) => ({
+                workoutEntryId: entry.id,
+                setNumber: j + 1,
+                variantId: s.variantId || null,
+                reps: s.reps ?? null,
+                holdSeconds: s.holdSeconds ?? null,
+                weightKg: s.weightKg ?? null,
+                rpe: s.rpe ?? null,
+              }),
+            ),
+          });
+        }
       }
 
       return tx.workout.findUnique({

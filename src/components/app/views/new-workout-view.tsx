@@ -27,6 +27,7 @@ import { api } from "@/lib/api-client";
 import {
   type ExerciseWithVariants,
   type ExerciseCategory,
+  type ComboStep,
 } from "@/lib/types";
 import { metricUnit, fmtCompact, supersetLabel, supersetColor, difficultyStars } from "@/lib/calc";
 import {
@@ -48,6 +49,7 @@ import {
 import { useTimerStore, REST_PRESETS } from "@/lib/timer-store";
 import { EmptyState, SectionHeading } from "@/components/app/common";
 import { ExercisePickerDialog } from "@/components/app/exercise-picker-dialog";
+import { ComboEditor } from "@/components/app/combo-editor";
 
 import {
   Card,
@@ -241,6 +243,8 @@ export function NewWorkoutView() {
         toast.error("Un de tes exercices est introuvable. Retire-le puis ré-ajoute-le.");
         return;
       }
+      const isCombo = entry.comboSteps.length > 0;
+      if (isCombo) continue;
       if (entry.sets.length === 0) {
         toast.error(`« ${ex.name} » n'a aucune série. Ajoute-en une ou retire l'entrée.`);
         return;
@@ -283,12 +287,18 @@ export function NewWorkoutView() {
       entries: entries.map((e) => {
         const ex = exerciseMap.get(e.exerciseId);
         const firstVariant = ex?.variants[0]?.id;
+        const isCombo = e.comboSteps.length > 0;
         return {
           exerciseId: e.exerciseId,
           variantId: e.variantId ?? firstVariant ?? null,
           supersetGroup: e.supersetGroup,
           notes: e.notes.trim() || undefined,
-          sets: e.sets.map((s) => {
+          comboSteps: isCombo ? e.comboSteps : undefined,
+          weightKg: isCombo ? e.comboWeightKg : undefined,
+          rpe: isCombo ? e.comboRpe : undefined,
+          comboValidated: isCombo ? e.comboValidated : undefined,
+          comboFailedSteps: isCombo ? e.comboFailedSteps : undefined,
+          sets: isCombo ? [] : e.sets.map((s) => {
             const mode = s.mode ?? (
               ex?.isStatic ? "hold" : "reps"
             );
@@ -454,6 +464,14 @@ export function NewWorkoutView() {
                 onSelectSuperset={(group) =>
                   draft.setSuperset(entry.id, group)
                 }
+                onAddComboStep={(step) => draft.addComboStep(entry.id, step)}
+                onRemoveComboStep={(stepId) => draft.removeComboStep(entry.id, stepId)}
+                onUpdateComboStep={(stepId, patch) => draft.updateComboStep(entry.id, stepId, patch)}
+                onReorderComboStep={(stepId, dir) => draft.reorderComboStep(entry.id, stepId, dir)}
+                onToggleComboValidated={() => draft.toggleComboValidated(entry.id)}
+                onToggleComboStepFailed={(stepId) => draft.toggleComboStepFailed(entry.id, stepId)}
+                onComboWeightKgChange={(v) => draft.updateEntry(entry.id, { comboWeightKg: v })}
+                onComboRpeChange={(v) => draft.updateEntry(entry.id, { comboRpe: v })}
               />
             );
           })}
@@ -737,6 +755,14 @@ function EntryCard({
   onRemoveSet,
   onValidateSet,
   onSelectSuperset,
+  onAddComboStep,
+  onRemoveComboStep,
+  onUpdateComboStep,
+  onReorderComboStep,
+  onToggleComboValidated,
+  onToggleComboStepFailed,
+  onComboWeightKgChange,
+  onComboRpeChange,
 }: {
   entry: DraftEntry;
   exercise: ExerciseWithVariants;
@@ -753,8 +779,17 @@ function EntryCard({
   onRemoveSet: (setId: string) => void;
   onValidateSet: (setId: string, validated: boolean) => void;
   onSelectSuperset: (group: number | null) => void;
+  onAddComboStep?: (step: ComboStep) => void;
+  onRemoveComboStep?: (stepId: string) => void;
+  onUpdateComboStep?: (stepId: string, patch: Partial<ComboStep>) => void;
+  onReorderComboStep?: (stepId: string, direction: "up" | "down") => void;
+  onToggleComboValidated?: () => void;
+  onToggleComboStepFailed?: (stepId: string) => void;
+  onComboWeightKgChange?: (value: number | undefined) => void;
+  onComboRpeChange?: (value: number | undefined) => void;
 }) {
-  const { variantId, notes, sets, supersetGroup } = entry;
+  const { variantId, notes, sets, supersetGroup, comboSteps, comboWeightKg, comboRpe, comboValidated, comboFailedSteps } = entry;
+  const isCombo = comboSteps.length > 0;
   const getCatMeta = useCategoryMeta();
   const cat = exercise.category as ExerciseCategory;
   const meta = getCatMeta(cat);
@@ -964,26 +999,75 @@ function EntryCard({
           aria-label={`Notes pour ${exercise.name}`}
         />
 
-        {/* Desktop: inline table */}
-        <div className="hidden sm:block">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs uppercase text-muted-foreground">
-                <th className="w-10 pb-2 text-left font-medium">Série</th>
-                <th className="pb-2 text-left font-medium">Valeur</th>
-                {sortedVariants.length > 0 && (
-                  <th className="w-20 pb-2 text-left font-medium">Var.</th>
-                )}
-                <th className="pb-2 text-left font-medium">Poids (kg)</th>
-                <th className="pb-2 text-left font-medium">RPE</th>
-                <th className="w-20 pb-2 text-center font-medium">Fait</th>
-                <th className="w-24 pb-2 text-right font-medium">Repos</th>
-                <th className="w-10 pb-2" />
-              </tr>
-            </thead>
-            <tbody>
+        {isCombo ? (
+          <ComboEditor
+            steps={comboSteps}
+            weightKg={comboWeightKg}
+            rpe={comboRpe}
+            validated={comboValidated}
+            failedSteps={comboFailedSteps}
+            onAddStep={onAddComboStep!}
+            onRemoveStep={onRemoveComboStep!}
+            onUpdateStep={onUpdateComboStep!}
+            onReorderStep={onReorderComboStep!}
+            onToggleValidated={onToggleComboValidated}
+            onToggleStepFailed={onToggleComboStepFailed}
+            onWeightKgChange={onComboWeightKgChange}
+            onRpeChange={onComboRpeChange}
+          />
+        ) : (
+          <>
+            {/* Desktop: inline table */}
+            <div className="hidden sm:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs uppercase text-muted-foreground">
+                    <th className="w-10 pb-2 text-left font-medium">Série</th>
+                    <th className="pb-2 text-left font-medium">Valeur</th>
+                    {sortedVariants.length > 0 && (
+                      <th className="w-20 pb-2 text-left font-medium">Var.</th>
+                    )}
+                    <th className="pb-2 text-left font-medium">Poids (kg)</th>
+                    <th className="pb-2 text-left font-medium">RPE</th>
+                    <th className="w-20 pb-2 text-center font-medium">Fait</th>
+                    <th className="w-24 pb-2 text-right font-medium">Repos</th>
+                    <th className="w-10 pb-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {sets.map((set, idx) => (
+                    <SetRowDesktop
+                      key={set.id}
+                      set={set}
+                      idx={idx}
+                      isStatic={isStatic}
+                      metricLabel={metricLabel}
+                      defaultRestSec={defaultRestSec}
+                      variants={sortedVariants}
+                      onUpdate={(patch) => onUpdateSet(set.id, patch)}
+                      onRemove={() => onRemoveSet(set.id)}
+                      onValidate={(v) => onValidateSet(set.id, v)}
+                      onVariantChange={(vid) => handleVariantChange(set.id, vid)}
+                    />
+                  ))}
+                  {sets.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={sortedVariants.length > 0 ? 8 : 7}
+                        className="py-3 text-center text-xs text-muted-foreground"
+                      >
+                        Aucune série pour le moment — ajoute-en une ci-dessous.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: stacked cards */}
+            <div className="space-y-2 sm:hidden">
               {sets.map((set, idx) => (
-                <SetRowDesktop
+                <SetRowMobile
                   key={set.id}
                   set={set}
                   idx={idx}
@@ -998,108 +1082,79 @@ function EntryCard({
                 />
               ))}
               {sets.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={sortedVariants.length > 0 ? 8 : 7}
-                    className="py-3 text-center text-xs text-muted-foreground"
-                  >
-                    Aucune série pour le moment — ajoute-en une ci-dessous.
-                  </td>
-                </tr>
+                <p className="py-3 text-center text-xs text-muted-foreground">
+                  Aucune série pour le moment — ajoute-en une ci-dessous.
+                </p>
               )}
-            </tbody>
-          </table>
-        </div>
+            </div>
 
-        {/* Mobile: stacked cards */}
-        <div className="space-y-2 sm:hidden">
-          {sets.map((set, idx) => (
-            <SetRowMobile
-              key={set.id}
-              set={set}
-              idx={idx}
-              isStatic={isStatic}
-              metricLabel={metricLabel}
-              defaultRestSec={defaultRestSec}
-              variants={sortedVariants}
-              onUpdate={(patch) => onUpdateSet(set.id, patch)}
-              onRemove={() => onRemoveSet(set.id)}
-              onValidate={(v) => onValidateSet(set.id, v)}
-              onVariantChange={(vid) => handleVariantChange(set.id, vid)}
-            />
-          ))}
-          {sets.length === 0 && (
-            <p className="py-3 text-center text-xs text-muted-foreground">
-              Aucune série pour le moment — ajoute-en une ci-dessous.
-            </p>
-          )}
-        </div>
+            <Button variant="outline" size="sm" onClick={handleAddSet}>
+              <Plus className="h-4 w-4" />
+              Ajouter une série
+            </Button>
 
-        <Button variant="outline" size="sm" onClick={handleAddSet}>
-          <Plus className="h-4 w-4" />
-          Ajouter une série
-        </Button>
+            <Separator />
 
-        <Separator />
-
-        {/* Per-entry summary */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <span>
-            <span className="font-medium text-foreground tabular-nums">
-              {totalSetsCount}
-            </span>{" "}
-            séries
-          </span>
-          {(hasReps || hasHold) && (
-            <span>
-              Volume{" "}
-              {hasReps && (
-                <>
-                  <span className="font-medium text-foreground tabular-nums">
-                    {fmtCompact(repsVolume)}
-                  </span>{" "}
-                  reps
-                </>
+            {/* Per-entry summary */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span>
+                <span className="font-medium text-foreground tabular-nums">
+                  {totalSetsCount}
+                </span>{" "}
+                séries
+              </span>
+              {(hasReps || hasHold) && (
+                <span>
+                  Volume{" "}
+                  {hasReps && (
+                    <>
+                      <span className="font-medium text-foreground tabular-nums">
+                        {fmtCompact(repsVolume)}
+                      </span>{" "}
+                      reps
+                    </>
+                  )}
+                  {hasReps && hasHold && <span className="mx-0.5">·</span>}
+                  {hasHold && (
+                    <>
+                      <span className="font-medium text-foreground tabular-nums">
+                        {fmtCompact(holdVolume)}
+                      </span>{" "}
+                      s
+                    </>
+                  )}
+                </span>
               )}
-              {hasReps && hasHold && <span className="mx-0.5">·</span>}
-              {hasHold && (
-                <>
-                  <span className="font-medium text-foreground tabular-nums">
-                    {fmtCompact(holdVolume)}
-                  </span>{" "}
-                  s
-                </>
+              {(bestReps > 0 || bestHold > 0) && (
+                <span>
+                  Meilleure{" "}
+                  {bestReps > 0 && (
+                    <>
+                      <span className="font-medium text-foreground tabular-nums">
+                        {fmtCompact(bestReps)}
+                      </span>{" "}
+                      reps
+                    </>
+                  )}
+                  {bestReps > 0 && bestHold > 0 && <span className="mx-0.5">·</span>}
+                  {bestHold > 0 && (
+                    <>
+                      <span className="font-medium text-foreground tabular-nums">
+                        {fmtCompact(bestHold)}
+                      </span>{" "}
+                      s
+                    </>
+                  )}
+                </span>
               )}
-            </span>
-          )}
-          {(bestReps > 0 || bestHold > 0) && (
-            <span>
-              Meilleure{" "}
-              {bestReps > 0 && (
-                <>
-                  <span className="font-medium text-foreground tabular-nums">
-                    {fmtCompact(bestReps)}
-                  </span>{" "}
-                  reps
-                </>
+              {validatedCount > 0 && (
+                <span className="text-emerald-500">
+                  <span className="font-medium tabular-nums">{validatedCount}</span> validée{validatedCount > 1 ? "s" : ""}
+                </span>
               )}
-              {bestReps > 0 && bestHold > 0 && <span className="mx-0.5">·</span>}
-              {bestHold > 0 && (
-                <>
-                  <span className="font-medium text-foreground tabular-nums">
-                    {fmtCompact(bestHold)}
-                  </span>{" "}
-                  s
-                </>
-              )}
-            </span>
-          )}
-          {validatedCount > 0 && (
-            <span className="text-emerald-500">
-              <span className="font-medium tabular-nums">{validatedCount}</span> validée{validatedCount > 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

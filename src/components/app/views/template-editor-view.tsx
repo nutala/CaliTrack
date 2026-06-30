@@ -19,6 +19,7 @@ import { useCategoryMeta } from "@/hooks/use-data";
 import type {
   ExerciseWithVariants,
   ExerciseCategory,
+  ComboStep,
 } from "@/lib/types";
 import { difficultyStars } from "@/lib/calc";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { EmptyState } from "@/components/app/common";
 import { ExercisePickerDialog } from "@/components/app/exercise-picker-dialog";
+import { ComboEditor } from "@/components/app/combo-editor";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -55,6 +57,7 @@ interface EditorEntry {
   supersetGroup: number | null;
   notes: string;
   sets: EditorSet[];
+  comboSteps: ComboStep[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -145,6 +148,7 @@ export function TemplateEditorView() {
                     };
                   },
                 ),
+                comboSteps: (Array.isArray(e.comboSteps) ? e.comboSteps : []) as ComboStep[],
               })),
             );
           }
@@ -167,6 +171,7 @@ export function TemplateEditorView() {
   }, [templateEditorId]);
 
   function handlePickExercise(ex: ExerciseWithVariants) {
+    const isCombo = ex.name === "Combos";
     setEntries((prev) => [
       ...prev,
       {
@@ -174,7 +179,8 @@ export function TemplateEditorView() {
         exerciseId: ex.id,
         supersetGroup: null,
         notes: "",
-        sets: [makeDefaultSet(ex)],
+        sets: isCombo ? [] : [makeDefaultSet(ex)],
+        comboSteps: [],
       },
     ]);
     setPickerOpen(false);
@@ -247,6 +253,7 @@ export function TemplateEditorView() {
           variantId: null,
           supersetGroup: e.supersetGroup,
           notes: e.notes || undefined,
+          comboSteps: e.comboSteps.length > 0 ? e.comboSteps : undefined,
           sets: e.sets.map((s) => ({
             isHold: s.isHold ?? false,
             variantId: s.variantId || null,
@@ -318,8 +325,8 @@ export function TemplateEditorView() {
             }
           />
         ) : (
-          entries.map((entry) => {
-            const ex = exerciseMap.get(entry.exerciseId);
+          entries.map((e) => {
+            const ex = exerciseMap.get(e.exerciseId);
             if (!ex) return null;
             const cat = ex.category as ExerciseCategory;
             const meta = getCatMeta(cat);
@@ -327,8 +334,9 @@ export function TemplateEditorView() {
             const sortedVariants = ex.variants
               ?.slice()
               .sort((a, b) => a.difficultyLevel - b.difficultyLevel);
+            const entryId = e.id;
             return (
-              <Card key={entry.id}>
+              <Card key={entryId}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -373,7 +381,7 @@ export function TemplateEditorView() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => removeEntry(entry.id)}
+                      onClick={() => removeEntry(entryId)}
                       aria-label={`Retirer ${ex.name}`}
                       className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
                     >
@@ -383,165 +391,216 @@ export function TemplateEditorView() {
                 </CardHeader>
 
                 <CardContent className="space-y-3">
-                  {/* Sets */}
-                  {entry.sets.map((set, idx) => {
-                    const isHold = set.isHold ?? isStatic;
-                    const mode = isHold ? "hold" : "reps";
-                    const otherMode = mode === "reps" ? "hold" : "reps";
-                    const metricValue =
-                      mode === "reps"
-                        ? set.targetReps
-                        : set.targetHoldSeconds;
-                    return (
-                      <div
-                        key={set.id}
-                        className="rounded-lg border border-border/60 bg-muted/20 p-3 transition-colors"
-                      >
-                        {/* Header */}
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground tabular-nums">
-                            Série {idx + 1}
-                          </span>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => removeSet(entry.id, set.id)}
-                            aria-label={`Supprimer la série ${idx + 1}`}
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-
-                        {/* 3-column grid: metric | weight | RPE */}
-                        <div className="grid grid-cols-3 gap-2">
-                          {/* Metric */}
-                          <div className="space-y-1">
-                            {!isStatic && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateSet(entry.id, set.id, {
-                                    isHold: mode !== "hold",
-                                  })
+                  {e.comboSteps.length > 0 ? (
+                    <ComboEditor
+                      steps={e.comboSteps}
+                      validated={false}
+                      failedSteps={[]}
+                      onAddStep={(step) =>
+                        setEntries((prev) =>
+                          prev.map((en) =>
+                            en.id === entryId
+                              ? { ...en, comboSteps: [...en.comboSteps, step] }
+                              : en,
+                          ),
+                        )
+                      }
+                      onRemoveStep={(stepId) =>
+                        setEntries((prev) =>
+                          prev.map((en) =>
+                            en.id === entryId
+                              ? { ...en, comboSteps: en.comboSteps.filter((s) => s.id !== stepId) }
+                              : en,
+                          ),
+                        )
+                      }
+                      onUpdateStep={(stepId, patch) =>
+                        setEntries((prev) =>
+                          prev.map((en) =>
+                            en.id === entryId
+                              ? {
+                                  ...en,
+                                  comboSteps: en.comboSteps.map((s) =>
+                                    s.id === stepId ? { ...s, ...patch } : s,
+                                  ),
                                 }
-                                className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
-                                aria-label={`Passer en ${otherMode === "reps" ? "répétitions" : "maintien (s)"}`}
-                              >
-                                {mode === "reps" ? "Reps" : "Maintien (s)"}
-                              </button>
-                            )}
-                            {isStatic && (
-                              <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                                Maintien (s)
+                              : en,
+                          ),
+                        )
+                      }
+                      onReorderStep={(stepId, direction) =>
+                        setEntries((prev) => {
+                          const ent = prev.find((en) => en.id === entryId);
+                          if (!ent) return prev;
+                          const idx = ent.comboSteps.findIndex((s) => s.id === stepId);
+                          if (idx === -1) return prev;
+                          if (direction === "up" && idx === 0) return prev;
+                          if (direction === "down" && idx === ent.comboSteps.length - 1) return prev;
+                          const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+                          const next = [...ent.comboSteps];
+                          [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+                          return prev.map((en) =>
+                            en.id === entryId ? { ...en, comboSteps: next } : en,
+                          );
+                        })
+                      }
+                    />
+                  ) : (
+                    <>
+                      {e.sets.map((s, idx) => {
+                        const isHold = s.isHold ?? isStatic;
+                        const mode = isHold ? "hold" : "reps";
+                        const otherMode = mode === "reps" ? "hold" : "reps";
+                        const metricValue =
+                          mode === "reps"
+                            ? s.targetReps
+                            : s.targetHoldSeconds;
+                        return (
+                          <div
+                            key={s.id}
+                            className="rounded-lg border border-border/60 bg-muted/20 p-3 transition-colors"
+                          >
+                            <div className="mb-2 flex items-center justify-between">
+                              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground tabular-nums">
+                                Série {idx + 1}
                               </span>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => removeSet(entryId, s.id)}
+                                aria-label={`Supprimer la série ${idx + 1}`}
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2">
+                              <div className="space-y-1">
+                                {!isStatic && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateSet(entryId, s.id, {
+                                        isHold: mode !== "hold",
+                                      })
+                                    }
+                                    className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
+                                    aria-label={`Passer en ${otherMode === "reps" ? "répétitions" : "maintien (s)"}`}
+                                  >
+                                    {mode === "reps" ? "Reps" : "Maintien (s)"}
+                                  </button>
+                                )}
+                                {isStatic && (
+                                  <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                    Maintien (s)
+                                  </span>
+                                )}
+                                <Input
+                                  type="number"
+                                  inputMode="decimal"
+                                  placeholder={mode === "hold" ? "30" : "8"}
+                                  value={metricValue ?? ""}
+                                  onChange={(ev) => {
+                                    const v =
+                                      ev.target.value === ""
+                                        ? undefined
+                                        : Number(ev.target.value) || undefined;
+                                    updateSet(entryId, s.id, {
+                                      ...(mode === "reps"
+                                        ? { targetReps: v, targetHoldSeconds: undefined }
+                                        : { targetHoldSeconds: v, targetReps: undefined }),
+                                    });
+                                  }}
+                                  className="h-9 tabular-nums"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  Poids (kg)
+                                </span>
+                                <Input
+                                  type="number"
+                                  inputMode="decimal"
+                                  placeholder="0"
+                                  value={s.targetWeightKg ?? ""}
+                                  onChange={(ev) => {
+                                    const v =
+                                      ev.target.value === ""
+                                        ? undefined
+                                        : Number(ev.target.value) || undefined;
+                                    updateSet(entryId, s.id, {
+                                      targetWeightKg: v,
+                                    });
+                                  }}
+                                  className="h-9 tabular-nums"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  RPE
+                                </span>
+                                <Input
+                                  type="number"
+                                  inputMode="decimal"
+                                  min={1}
+                                  max={10}
+                                  placeholder="7"
+                                  value={s.targetRpe ?? ""}
+                                  onChange={(ev) => {
+                                    const v =
+                                      ev.target.value === ""
+                                        ? undefined
+                                        : Number(ev.target.value) || undefined;
+                                    updateSet(entryId, s.id, {
+                                      targetRpe: v,
+                                    });
+                                  }}
+                                  className="h-9 tabular-nums"
+                                />
+                              </div>
+                            </div>
+
+                            {sortedVariants && sortedVariants.length > 0 && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  Variante
+                                </span>
+                                <select
+                                  value={
+                                    s.variantId ?? sortedVariants[0]?.id ?? ""
+                                  }
+                                  onChange={(ev) =>
+                                    updateSet(entryId, s.id, {
+                                      variantId: ev.target.value || null,
+                                    })
+                                  }
+                                  className="h-7 min-w-0 flex-1 rounded-md border border-border/60 bg-background px-1.5 text-xs tabular-nums outline-none focus:ring-2 focus:ring-ring"
+                                >
+                                  {sortedVariants.map((v) => (
+                                    <option key={v.id} value={v.id}>
+                                      {v.name} {difficultyStars(v.difficultyLevel)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                             )}
-                            <Input
-                              type="number"
-                              inputMode="decimal"
-                              placeholder={mode === "hold" ? "30" : "8"}
-                              value={metricValue ?? ""}
-                              onChange={(e) => {
-                                const v =
-                                  e.target.value === ""
-                                    ? undefined
-                                    : Number(e.target.value) || undefined;
-                                updateSet(entry.id, set.id, {
-                                  ...(mode === "reps"
-                                    ? { targetReps: v, targetHoldSeconds: undefined }
-                                    : { targetHoldSeconds: v, targetReps: undefined }),
-                                });
-                              }}
-                              className="h-9 tabular-nums"
-                            />
                           </div>
+                        );
+                      })}
 
-                          {/* Weight */}
-                          <div className="space-y-1">
-                            <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                              Poids (kg)
-                            </span>
-                            <Input
-                              type="number"
-                              inputMode="decimal"
-                              placeholder="0"
-                              value={set.targetWeightKg ?? ""}
-                              onChange={(e) => {
-                                const v =
-                                  e.target.value === ""
-                                    ? undefined
-                                    : Number(e.target.value) || undefined;
-                                updateSet(entry.id, set.id, {
-                                  targetWeightKg: v,
-                                });
-                              }}
-                              className="h-9 tabular-nums"
-                            />
-                          </div>
-
-                          {/* RPE */}
-                          <div className="space-y-1">
-                            <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                              RPE
-                            </span>
-                            <Input
-                              type="number"
-                              inputMode="decimal"
-                              min={1}
-                              max={10}
-                              placeholder="7"
-                              value={set.targetRpe ?? ""}
-                              onChange={(e) => {
-                                const v =
-                                  e.target.value === ""
-                                    ? undefined
-                                    : Number(e.target.value) || undefined;
-                                updateSet(entry.id, set.id, {
-                                  targetRpe: v,
-                                });
-                              }}
-                              className="h-9 tabular-nums"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Variant selector */}
-                        {sortedVariants && sortedVariants.length > 0 && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                              Variante
-                            </span>
-                            <select
-                              value={
-                                set.variantId ?? sortedVariants[0]?.id ?? ""
-                              }
-                              onChange={(e) =>
-                                updateSet(entry.id, set.id, {
-                                  variantId: e.target.value || null,
-                                })
-                              }
-                              className="h-7 min-w-0 flex-1 rounded-md border border-border/60 bg-background px-1.5 text-xs tabular-nums outline-none focus:ring-2 focus:ring-ring"
-                            >
-                              {sortedVariants.map((v) => (
-                                <option key={v.id} value={v.id}>
-                                  {v.name} {difficultyStars(v.difficultyLevel)}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addSet(entry.id)}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Ajouter une série
-                  </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addSet(entryId)}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Ajouter une série
+                      </Button>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             );

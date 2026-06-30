@@ -762,14 +762,18 @@ function ExerciseCard({
                 <Pencil className="h-4 w-4" />
                 Modifier
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              >
-                <Trash2 className="h-4 w-4" />
-                Supprimer
-              </DropdownMenuItem>
+              {exercise.name !== "Combos" && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Supprimer
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

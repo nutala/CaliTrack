@@ -8,7 +8,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { format } from "date-fns";
-import type { ExerciseWithVariants, WorkoutFull, WorkoutTemplateFull } from "@/lib/types";
+import type { ExerciseWithVariants, WorkoutFull, WorkoutTemplateFull, ComboStep } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Draft types — transient, never persisted to DB
@@ -34,6 +34,12 @@ export type DraftEntry = {
   /// Null = standalone; a positive number groups entries into a superset.
   supersetGroup: number | null;
   sets: DraftSet[];
+  // Combo-specific fields
+  comboSteps: ComboStep[];
+  comboWeightKg?: number;
+  comboRpe?: number;
+  comboValidated: boolean;
+  comboFailedSteps: string[];
 };
 
 export type WorkoutDraft = {
@@ -96,6 +102,14 @@ interface WorkoutDraftStore extends WorkoutDraft {
   removeSet: (entryId: string, setId: string) => void;
   validateSet: (entryId: string, setId: string, validated: boolean) => void;
 
+  // Combo methods
+  addComboStep: (entryId: string, step: ComboStep) => void;
+  removeComboStep: (entryId: string, stepId: string) => void;
+  updateComboStep: (entryId: string, stepId: string, patch: Partial<ComboStep>) => void;
+  reorderComboStep: (entryId: string, stepId: string, direction: "up" | "down") => void;
+  toggleComboValidated: (entryId: string) => void;
+  toggleComboStepFailed: (entryId: string, stepId: string) => void;
+
   /// Move an entry from one index to another (drag-and-drop reorder).
   reorderEntries: (fromId: string, toId: string) => void;
 
@@ -129,25 +143,31 @@ export const useDraftStore = create<WorkoutDraftStore>()(
   setMeta: (key, value) => set({ [key]: value } as Partial<WorkoutDraft>),
 
   addEntry: (exercise) =>
-    set((s) => ({
-      entries: [
-        ...s.entries,
-        {
-          id: uid(),
-          exerciseId: exercise.id,
-          variantId: null,
-          notes: "",
-          supersetGroup: null,
-          sets: [
-            {
-              id: uid(),
-              validated: false,
-              mode: exercise.isStatic ? "hold" : "reps",
-            },
-          ],
-        },
-      ],
-    })),
+    set((s) => {
+      const isCombo = exercise.name === "Combos";
+      return {
+        entries: [
+          ...s.entries,
+          {
+            id: uid(),
+            exerciseId: exercise.id,
+            variantId: null,
+            notes: "",
+            supersetGroup: null,
+            sets: isCombo ? [] : [
+              {
+                id: uid(),
+                validated: false,
+                mode: exercise.isStatic ? "hold" : "reps",
+              },
+            ],
+            comboSteps: [],
+            comboValidated: false,
+            comboFailedSteps: [],
+          },
+        ],
+      };
+    }),
 
   removeEntry: (entryId) =>
     set((s) => ({
@@ -220,6 +240,85 @@ export const useDraftStore = create<WorkoutDraftStore>()(
       ),
     })),
 
+  // ── Combo methods ──────────────────────────────────────────
+
+  addComboStep: (entryId, step) =>
+    set((s) => ({
+      entries: s.entries.map((e) =>
+        e.id === entryId
+          ? { ...e, comboSteps: [...e.comboSteps, step] }
+          : e,
+      ),
+    })),
+
+  removeComboStep: (entryId, stepId) =>
+    set((s) => ({
+      entries: s.entries.map((e) =>
+        e.id === entryId
+          ? {
+              ...e,
+              comboSteps: e.comboSteps.filter((st) => st.id !== stepId),
+            }
+          : e,
+      ),
+    })),
+
+  updateComboStep: (entryId, stepId, patch) =>
+    set((s) => ({
+      entries: s.entries.map((e) =>
+        e.id === entryId
+          ? {
+              ...e,
+              comboSteps: e.comboSteps.map((st) =>
+                st.id === stepId ? { ...st, ...patch } : st,
+              ),
+            }
+          : e,
+      ),
+    })),
+
+  reorderComboStep: (entryId, stepId, direction) =>
+    set((s) => {
+      const entry = s.entries.find((e) => e.id === entryId);
+      if (!entry) return s;
+      const idx = entry.comboSteps.findIndex((st) => st.id === stepId);
+      if (idx === -1) return s;
+      if (direction === "up" && idx === 0) return s;
+      if (direction === "down" && idx === entry.comboSteps.length - 1) return s;
+      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+      const next = [...entry.comboSteps];
+      [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+      return {
+        entries: s.entries.map((e) =>
+          e.id === entryId ? { ...e, comboSteps: next } : e,
+        ),
+      };
+    }),
+
+  toggleComboValidated: (entryId) =>
+    set((s) => ({
+      entries: s.entries.map((e) =>
+        e.id === entryId
+          ? { ...e, comboValidated: !e.comboValidated }
+          : e,
+      ),
+    })),
+
+  toggleComboStepFailed: (entryId, stepId) =>
+    set((s) => {
+      const entry = s.entries.find((e) => e.id === entryId);
+      if (!entry) return s;
+      const wasFailed = entry.comboFailedSteps.includes(stepId);
+      const newFailed = wasFailed
+        ? entry.comboFailedSteps.filter((id) => id !== stepId)
+        : [...entry.comboFailedSteps, stepId];
+      return {
+        entries: s.entries.map((e) =>
+          e.id === entryId ? { ...e, comboFailedSteps: newFailed } : e,
+        ),
+      };
+    }),
+
   reorderEntries: (fromId, toId) =>
     set((s) => {
       const fromIdx = s.entries.findIndex((e) => e.id === fromId);
@@ -246,13 +345,16 @@ export const useDraftStore = create<WorkoutDraftStore>()(
       const ex = exerciseMap.get(e.exerciseId);
       // Skip exercises that no longer exist in the catalogue.
       if (!ex) continue;
+      const rawComboSteps = (e as unknown as { comboSteps: unknown }).comboSteps;
+      const comboSteps = Array.isArray(rawComboSteps) ? rawComboSteps as ComboStep[] : [];
+      const isCombo = comboSteps.length > 0;
       entries.push({
         id: uid(),
         exerciseId: e.exerciseId,
         variantId: e.variantId ?? null,
         notes: e.notes ?? "",
         supersetGroup: e.supersetGroup ?? null,
-        sets: e.sets.map((st) => ({
+        sets: isCombo ? [] : e.sets.map((st) => ({
           id: uid(),
           variantId: st.variantId ?? undefined,
           reps: st.reps ?? undefined,
@@ -261,6 +363,11 @@ export const useDraftStore = create<WorkoutDraftStore>()(
           rpe: st.rpe ?? undefined,
           validated: false,
         })),
+        comboSteps,
+        comboWeightKg: (e as unknown as { comboWeightKg: number | null }).comboWeightKg ?? undefined,
+        comboRpe: (e as unknown as { comboRpe: number | null }).comboRpe ?? undefined,
+        comboValidated: false,
+        comboFailedSteps: [],
       });
     }
     set({
@@ -289,7 +396,10 @@ export const useDraftStore = create<WorkoutDraftStore>()(
         targetWeightKg?: number;
         targetRpe?: number;
       }>) ?? [];
-      const sets: DraftSet[] = targetSets.length > 0
+      const rawComboSteps = (e as unknown as { comboSteps: unknown }).comboSteps;
+      const templateComboSteps = Array.isArray(rawComboSteps) ? rawComboSteps as ComboStep[] : [];
+      const isCombo = templateComboSteps.length > 0;
+      const sets: DraftSet[] = isCombo ? [] : (targetSets.length > 0
         ? targetSets.map((ts) => ({
             id: uid(),
             variantId: ts.variantId ?? undefined,
@@ -300,7 +410,7 @@ export const useDraftStore = create<WorkoutDraftStore>()(
             rpe: ts.targetRpe ?? undefined,
             validated: false,
           }))
-        : [{ id: uid(), validated: false, mode: ex.isStatic ? "hold" : "reps" }];
+        : [{ id: uid(), validated: false, mode: ex.isStatic ? "hold" : "reps" }]);
       newEntries.push({
         id: uid(),
         exerciseId: e.exerciseId,
@@ -308,6 +418,9 @@ export const useDraftStore = create<WorkoutDraftStore>()(
         notes: e.notes ?? "",
         supersetGroup: e.supersetGroup ?? null,
         sets,
+        comboSteps: templateComboSteps,
+        comboValidated: false,
+        comboFailedSteps: [],
       });
     }
     set((s) => ({

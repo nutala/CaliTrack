@@ -23,10 +23,27 @@ import { CATEGORY_META } from "@/lib/types";
 
 /** ----- Exercises ----- */
 export function useExercises() {
-  return useQuery<ExerciseWithVariants[]>({
+  const qc = useQueryClient();
+  const query = useQuery<ExerciseWithVariants[]>({
     queryKey: qk.exercises,
     queryFn: () => api.get<ExerciseWithVariants[]>("/api/exercises"),
   });
+
+  React.useEffect(() => {
+    if (query.data && !query.data.some((ex) => ex.name === "Combos")) {
+      api
+        .post<ExerciseWithVariants>("/api/exercises", {
+          name: "Combos",
+          category: "Combo",
+          muscleGroup: "Full body",
+          description: "Enchaînement de plusieurs exercices à réaliser à la suite.",
+        })
+        .then(() => qc.invalidateQueries({ queryKey: qk.exercises }))
+        .catch(() => {});
+    }
+  }, [query.data, qc]);
+
+  return query;
 }
 
 export function useCreateExercise() {
@@ -156,12 +173,25 @@ export type NewWorkoutPayload = {
     variantId?: string | null;
     supersetGroup?: number | null;
     notes?: string;
+    weightKg?: number;
+    rpe?: number;
+    comboValidated?: boolean;
+    comboFailedSteps?: string[];
     sets: {
       variantId?: string | null;
       reps?: number;
       holdSeconds?: number;
       weightKg?: number;
       rpe?: number;
+    }[];
+    comboSteps?: {
+      id: string;
+      exerciseId: string;
+      variantId?: string | null;
+      mode?: string;
+      reps?: number;
+      holdSeconds?: number;
+      failed?: boolean;
     }[];
   }[];
 };
@@ -471,6 +501,14 @@ export function useSaveTemplate() {
           targetHoldSeconds?: number;
           targetWeightKg?: number;
           targetRpe?: number;
+        }[];
+        comboSteps?: {
+          id: string;
+          exerciseId: string;
+          variantId?: string | null;
+          mode?: string;
+          reps?: number;
+          holdSeconds?: number;
         }[];
       }[];
     }) => {

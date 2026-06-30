@@ -12,6 +12,7 @@ import {
   type ExerciseCategory,
   type WorkoutFull,
   type WorkoutEntryFull,
+  type ComboStep,
 } from "@/lib/types";
 import {
   fmtCompact,
@@ -646,6 +647,11 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
   const ssLabel = supersetLabel(entry.supersetGroup);
   const ssColor = supersetColor(entry.supersetGroup);
   const inSuperset = entry.supersetGroup != null;
+  const rawComboSteps = (entry as unknown as { comboSteps: unknown }).comboSteps;
+  const comboSteps: ComboStep[] = Array.isArray(rawComboSteps) ? rawComboSteps : [];
+  const isCombo = comboSteps.length > 0;
+  const rawComboWeightKg = (entry as unknown as { comboWeightKg: number | null }).comboWeightKg;
+  const rawComboRpe = (entry as unknown as { comboRpe: number | null }).comboRpe;
 
   return (
     <div
@@ -686,63 +692,116 @@ function EntryDetail({ entry }: { entry: WorkoutEntryFull }) {
         </p>
       )}
 
-      {totalSets > 0 && (
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-xs tabular-nums table-fixed">
-            <colgroup>
-              <col className="w-[12%]" />
-              <col className="w-[36%]" />
-              <col className="w-[22%]" />
-              <col className="w-[15%]" />
-              <col className="w-[15%]" />
-            </colgroup>
-            <thead>
-              <tr className="text-left text-muted-foreground">
-                <th className="py-1 pr-2 font-medium">Série</th>
-                <th className="py-1 pr-2 font-medium">Variante</th>
-                <th className="py-1 pr-2 font-medium">Valeur</th>
-                <th className="py-1 pr-2 font-medium">kg</th>
-                <th className="py-1 font-medium">RPE</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entry.sets.map((s) => (
-                <tr key={s.id} className="border-t border-border/40">
-                  <td className="truncate py-1.5 pr-2 text-muted-foreground">
-                    {s.setNumber}
-                  </td>
-                  <td className="truncate py-1.5 pr-2 font-medium text-foreground">
-                    {s.variant ? variantLabel(s.variant) : "—"}
-                  </td>
-                  <td className="truncate py-1.5 pr-2 font-medium text-foreground">
-                    {s.holdSeconds != null ? (
-                      <>{s.holdSeconds} <span className="text-muted-foreground">s</span></>
-                    ) : (
-                      <>{s.reps ?? "—"} <span className="text-muted-foreground">reps</span></>
-                    )}
-                  </td>
-                  <td className="truncate py-1.5 pr-2 text-muted-foreground">
-                    {s.weightKg != null ? `${s.weightKg}` : "—"}
-                  </td>
-                  <td className="truncate py-1.5 text-muted-foreground">
-                    {s.rpe ?? "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {isCombo ? (
+        <div className="mt-3 space-y-1">
+          {rawComboWeightKg != null && (
+            <p className="text-xs text-muted-foreground">
+              Poids : {rawComboWeightKg} kg
+              {rawComboRpe != null && <> · RPE : {rawComboRpe}/10</>}
+            </p>
+          )}
+          {comboSteps.map((step, idx) => {
+            const catMeta = getCatMeta(step.category);
+            const mode = step.mode ?? (step.isStatic ? "hold" : "reps");
+            return (
+              <div
+                key={step.id}
+                className="flex flex-wrap items-center gap-2 rounded-md bg-muted/30 px-3 py-2 text-sm"
+              >
+                <span className="text-xs font-medium text-muted-foreground tabular-nums">
+                  {idx + 1}
+                </span>
+                {idx > 0 && (
+                  <span className="text-muted-foreground/40">➔</span>
+                )}
+                <span className="font-medium">{step.exerciseName}</span>
+                <Badge
+                  variant="outline"
+                  className="border-transparent px-1.5 py-0 text-[9px] leading-tight"
+                  style={{ backgroundColor: `${catMeta.color}22`, color: catMeta.color }}
+                >
+                  {catMeta.label}
+                </Badge>
+                <span className="tabular-nums text-muted-foreground">
+                  {mode === "reps"
+                    ? `${step.reps ?? "—"} reps`
+                    : `${step.holdSeconds ?? "—"}s`}
+                </span>
+                {step.variantName && (
+                  <span className="text-xs text-muted-foreground">
+                    · {step.variantName}
+                  </span>
+                )}
+                {step.failed && (
+                  <Badge variant="destructive" className="text-[9px] px-1.5 py-0">
+                    Échoué
+                  </Badge>
+                )}
+              </div>
+            );
+          })}
         </div>
-      )}
+      ) : (
+        <>
+          {totalSets > 0 && (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-xs tabular-nums table-fixed">
+                <colgroup>
+                  <col className="w-[12%]" />
+                  <col className="w-[36%]" />
+                  <col className="w-[22%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[15%]" />
+                </colgroup>
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="py-1 pr-2 font-medium">Série</th>
+                    <th className="py-1 pr-2 font-medium">Variante</th>
+                    <th className="py-1 pr-2 font-medium">Valeur</th>
+                    <th className="py-1 pr-2 font-medium">kg</th>
+                    <th className="py-1 font-medium">RPE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entry.sets.map((s) => (
+                    <tr key={s.id} className="border-t border-border/40">
+                      <td className="truncate py-1.5 pr-2 text-muted-foreground">
+                        {s.setNumber}
+                      </td>
+                      <td className="truncate py-1.5 pr-2 font-medium text-foreground">
+                        {s.variant ? variantLabel(s.variant) : "—"}
+                      </td>
+                      <td className="truncate py-1.5 pr-2 font-medium text-foreground">
+                        {s.holdSeconds != null ? (
+                          <>{s.holdSeconds} <span className="text-muted-foreground">s</span></>
+                        ) : (
+                          <>{s.reps ?? "—"} <span className="text-muted-foreground">reps</span></>
+                        )}
+                      </td>
+                      <td className="truncate py-1.5 pr-2 text-muted-foreground">
+                        {s.weightKg != null ? `${s.weightKg}` : "—"}
+                      </td>
+                      <td className="truncate py-1.5 text-muted-foreground">
+                        {s.rpe ?? "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] tabular-nums text-muted-foreground">
-        <span>{totalSets} séries</span>
-        <span aria-hidden>·</span>
-        <span>{fmtCompact(totalVol)} vol</span>
-        <span aria-hidden>·</span>
-        <span>
-          meilleure {best} {unit}
-        </span>
-      </div>
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] tabular-nums text-muted-foreground">
+            <span>{totalSets} séries</span>
+            <span aria-hidden>·</span>
+            <span>{fmtCompact(totalVol)} vol</span>
+            <span aria-hidden>·</span>
+            <span>
+              meilleure {best} {unit}
+            </span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

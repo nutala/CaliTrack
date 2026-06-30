@@ -3,12 +3,23 @@ import { db } from "@/lib/db";
 
 type Params = { params: Promise<{ id: string }> };
 
+async function getExercise(id: string) {
+  return db.exercise.findUnique({ where: { id } });
+}
+
 /** PATCH /api/exercises/[id] */
 export async function PATCH(req: Request, { params }: Params) {
   const { id } = await params;
   const body = await req.json().catch(() => null);
   if (!body) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+  const existing = await getExercise(id);
+  if (!existing) {
+    return NextResponse.json({ error: "Exercice introuvable" }, { status: 404 });
+  }
+  if (existing.name === "Combos" && body.name !== undefined && String(body.name).trim() !== "Combos") {
+    return NextResponse.json({ error: "L'exercice Combos ne peut pas être renommé." }, { status: 403 });
   }
   try {
     const updated = await db.exercise.update({
@@ -38,6 +49,13 @@ export async function PATCH(req: Request, { params }: Params) {
 /** DELETE /api/exercises/[id] */
 export async function DELETE(_req: Request, { params }: Params) {
   const { id } = await params;
+  const existing = await getExercise(id);
+  if (!existing) {
+    return NextResponse.json({ error: "Exercice introuvable" }, { status: 404 });
+  }
+  if (existing.name === "Combos") {
+    return NextResponse.json({ error: "L'exercice Combos ne peut pas être supprimé." }, { status: 403 });
+  }
   try {
     await db.exercise.delete({ where: { id } });
     return NextResponse.json({ ok: true });

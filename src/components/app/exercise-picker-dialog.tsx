@@ -20,6 +20,7 @@ interface Props {
   onPick: (exercise: ExerciseWithVariants) => void;
   title?: string;
   description?: string;
+  excludeIds?: string[];
 }
 
 export function ExercisePickerDialog({
@@ -28,6 +29,7 @@ export function ExercisePickerDialog({
   onPick,
   title = "Ajouter un exercice",
   description = "Recherche et choisis un exercice.",
+  excludeIds,
 }: Props) {
   const { data: exercises } = useExercises();
   const getCatMeta = useCategoryMeta();
@@ -57,7 +59,10 @@ export function ExercisePickerDialog({
         <CommandInput placeholder="Rechercher un exercice..." />
         <CommandList>
           <CommandEmpty>Aucun exercice trouvé.</CommandEmpty>
-          {grouped.map(([cat, list]) => {
+          {grouped
+            .map(([cat, list]) => [cat, excludeIds ? list.filter((ex) => !excludeIds.includes(ex.id)) : list] as const)
+            .filter(([, list]) => list.length > 0)
+            .map(([cat, list]) => {
             const meta = getCatMeta(cat);
             return (
               <CommandGroup
