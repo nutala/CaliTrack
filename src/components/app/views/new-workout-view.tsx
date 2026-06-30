@@ -374,64 +374,6 @@ export function NewWorkoutView() {
                 className="tabular-nums"
               />
             </div>
-
-            <div className="space-y-2 sm:col-span-2">
-              <div className="flex items-center justify-between">
-                <Label>Effort perçu</Label>
-                <Badge
-                  variant="outline"
-                  className={cn("tabular-nums", exertionBadgeClass(exertion))}
-                >
-                  {exertion}/10
-                </Badge>
-              </div>
-              <Slider
-                min={1}
-                max={10}
-                step={1}
-                value={[exertion]}
-                onValueChange={(v) => draft.setMeta("exertion", v[0] ?? 5)}
-                className={cn("mt-2", sliderAccentClass(exertion))}
-              />
-              <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
-                <span>1 Facile</span>
-                <span>5 Modéré</span>
-                <span>10 Max</span>
-              </div>
-            </div>
-
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="nw-notes">Notes</Label>
-              <Textarea
-                id="nw-notes"
-                placeholder="Comment s'est passée la séance ?"
-                value={notes}
-                onChange={(e) => draft.setMeta("notes", e.target.value)}
-                rows={2}
-              />
-            </div>
-
-            {/* Default rest duration */}
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label className="flex items-center gap-1.5">
-                <Coffee className="h-3.5 w-3.5" />
-                Repos par défaut entre les séries
-              </Label>
-              <div className="flex flex-wrap gap-2">
-                {REST_PRESETS.map((p) => (
-                  <Button
-                    key={p.sec}
-                    type="button"
-                    size="sm"
-                    variant={defaultRestSec === p.sec ? "default" : "outline"}
-                    className="h-8 tabular-nums"
-                    onClick={() => draft.setMeta("defaultRestSec", p.sec)}
-                  >
-                    {p.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -528,6 +470,43 @@ export function NewWorkoutView() {
           </div>
         </div>
       )}
+
+      {/* ----------------------- RPE + Notes (before save) ----------------------- */}
+      <div className="mx-auto max-w-7xl space-y-3 px-4 sm:px-6">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Effort perçu</Label>
+            <Badge
+              variant="outline"
+              className={cn("tabular-nums", exertionBadgeClass(exertion))}
+            >
+              {exertion}/10
+            </Badge>
+          </div>
+          <Slider
+            min={1}
+            max={10}
+            step={1}
+            value={[exertion]}
+            onValueChange={(v) => draft.setMeta("exertion", v[0] ?? 5)}
+            className={cn("mt-2", sliderAccentClass(exertion))}
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
+            <span>1 Facile</span>
+            <span>5 Modéré</span>
+            <span>10 Max</span>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="nw-notes">Notes</Label>
+          <Textarea
+            id="nw-notes"
+            placeholder="Comment s'est passée la séance ?"
+            value={notes}
+            onChange={(e) => draft.setMeta("notes", e.target.value)}
+          />
+        </div>
+      </div>
 
       {/* ----------------------- Sticky save bar ----------------------- */}
       <div className="sticky bottom-4 z-30">

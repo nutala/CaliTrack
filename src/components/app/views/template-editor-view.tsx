@@ -331,7 +331,7 @@ export function TemplateEditorView() {
               <Card key={entry.id}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <span aria-hidden className="text-base leading-none">
                         {meta.emoji}
                       </span>
