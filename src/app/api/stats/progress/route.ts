@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { format } from "date-fns";
 import type { ProgressPoint } from "@/lib/types";
 
 export async function GET(req: Request) {
@@ -26,7 +25,11 @@ export async function GET(req: Request) {
         : {}),
       workout: userId ? { userId } : { userId: null },
     },
-    include: { workout: true, variant: true, sets: { orderBy: { setNumber: "asc" } } },
+    include: {
+      workout: true,
+      variant: true,
+      sets: { include: { variant: true }, orderBy: { setNumber: "asc" } },
+    },
     orderBy: { workout: { date: "desc" } },
     take: limit,
   });
@@ -48,7 +51,7 @@ export async function GET(req: Request) {
           ? "s"
           : "reps";
       return {
-        date: format(e.workout.date, "yyyy-MM-dd"),
+        date: e.workout.date.toISOString().slice(0, 10),
         workoutId: e.workoutId,
         bestValue: Math.max(...sets.map((s) => s.reps ?? s.holdSeconds ?? 0)),
         totalVolume: sets.reduce((acc, s) => acc + (s.reps ?? s.holdSeconds ?? 0), 0),
@@ -58,6 +61,7 @@ export async function GET(req: Request) {
           return rpes.length ? Math.max(...rpes) : null;
         })(),
         unit,
+        variantName: bestSet?.variant?.name ?? null,
       };
     })
     .filter((p): p is ProgressPoint => p != null);

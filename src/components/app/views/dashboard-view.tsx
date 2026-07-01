@@ -303,17 +303,22 @@ function ProgressTracker() {
   const mergedData = useMemo(() => {
     const p1 = points1 ?? [];
     const p2 = points2 ?? [];
-    const byDate = new Map<string, { ex1Val?: number; ex1Unit?: string; ex2Val?: number; ex2Unit?: string }>();
+    const byDate = new Map<string, {
+      ex1Val?: number; ex1Unit?: string; ex1Variant?: string | null;
+      ex2Val?: number; ex2Unit?: string; ex2Variant?: string | null;
+    }>();
     for (const p of p1) {
       const entry = byDate.get(p.date) ?? {};
       entry.ex1Val = p.bestValue;
       entry.ex1Unit = p.unit;
+      entry.ex1Variant = p.variantName;
       byDate.set(p.date, entry);
     }
     for (const p of p2) {
       const entry = byDate.get(p.date) ?? {};
       entry.ex2Val = p.bestValue;
       entry.ex2Unit = p.unit;
+      entry.ex2Variant = p.variantName;
       byDate.set(p.date, entry);
     }
     return Array.from(byDate.entries())
@@ -347,6 +352,7 @@ function ProgressTracker() {
     const ex = isEx2 ? ex2 : ex1;
     const pt = item?.payload as Record<string, unknown> | undefined;
     const unit = isEx2 ? (pt?.ex2Unit as string) : (pt?.ex1Unit as string);
+    const variant = isEx2 ? (pt?.ex2Variant as string | null) : (pt?.ex1Variant as string | null);
     const color = isEx2 ? "var(--chart-2)" : "var(--chart-1)";
     return (
       <div className="flex w-full items-center gap-2">
@@ -354,7 +360,10 @@ function ProgressTracker() {
           className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
           style={{ backgroundColor: color }}
         />
-        <span className="text-muted-foreground">{ex?.name ?? key}</span>
+        <span className="text-muted-foreground">
+          {ex?.name ?? key}
+          {variant && <span className="ml-1 opacity-70">— {variant}</span>}
+        </span>
         <span className="ml-auto font-mono font-medium tabular-nums text-foreground">
           {Number(value).toLocaleString()}
           {unit && <span className="ml-1 font-sans text-muted-foreground">{unit}</span>}

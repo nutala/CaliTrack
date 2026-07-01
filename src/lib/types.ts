@@ -53,7 +53,7 @@ export type WorkoutFull = Workout & {
 
 /// A single "best performance" data point on the progress chart.
 export interface ProgressPoint {
-  date: string; // ISO date
+  date: string; // yyyy-MM-dd
   workoutId: string;
   /// Best metric for that workout (reps for dynamic, seconds for static, optional load)
   bestValue: number;
@@ -63,6 +63,8 @@ export interface ProgressPoint {
   rpe: number | null;
   /// Unit derived from the actual set data ("reps" or "s")
   unit: string;
+  /// Name of the variant that produced bestValue
+  variantName: string | null;
 }
 
 export interface OverviewStats {
