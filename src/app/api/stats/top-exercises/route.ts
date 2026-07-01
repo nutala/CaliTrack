@@ -19,12 +19,13 @@ export async function GET() {
     orderBy: { workout: { date: "desc" } },
   });
 
-  const map = new Map<string, TopExercise & { lastDate: Date | null }>();
+  const map = new Map<string, TopExercise & { lastDate: Date | null; seenWorkouts: Set<string> }>();
   for (const e of entries) {
     if (e.exercise.name === "Combos") continue;
     const existing = map.get(e.exerciseId);
     const metric = e.sets.reduce((s, set) => s + (set.reps ?? set.holdSeconds ?? 0), 0);
     const bestSet = Math.max(...e.sets.map((s) => s.reps ?? s.holdSeconds ?? 0), 0);
+    const wid = e.workoutId;
 
     // Determine whether the best set used hold (static) or reps
     let bestIsStatic = e.exercise.isStatic;
@@ -53,9 +54,13 @@ export async function GET() {
         sessions: 1, totalSets: e.sets.length, totalVolume: metric,
         bestValue: bestSet, topVariantName: bestSetVariantName,
         lastPerformed: e.workout.date.toISOString(), lastDate: e.workout.date,
+        seenWorkouts: new Set([wid]),
       });
     } else {
-      existing.sessions += 1;
+      if (!existing.seenWorkouts.has(wid)) {
+        existing.seenWorkouts.add(wid);
+        existing.sessions += 1;
+      }
       existing.totalSets += e.sets.length;
       existing.totalVolume += metric;
       if (bestSet > existing.bestValue) {
@@ -73,6 +78,6 @@ export async function GET() {
   const top = Array.from(map.values())
     .sort((a, b) => b.sessions - a.sessions || b.totalVolume - a.totalVolume)
     .slice(0, 8)
-    .map(({ lastDate, ...rest }) => rest);
+    .map(({ lastDate, seenWorkouts: _, ...rest }) => rest);
   return NextResponse.json(top satisfies TopExercise[]);
 }
