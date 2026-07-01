@@ -26,34 +26,32 @@ export async function GET() {
     const metric = e.sets.reduce((s, set) => s + (set.reps ?? set.holdSeconds ?? 0), 0);
     const bestSet = Math.max(...e.sets.map((s) => s.reps ?? s.holdSeconds ?? 0), 0);
 
-    // Best variant: check both the entry variant and per-set variants
-    const allVariants = [
-      ...(e.variant ? [e.variant] : []),
-      ...e.sets.map((s) => s.variant).filter((v): v is NonNullable<typeof v> => v != null),
-    ];
-    const bestVariant = allVariants.reduce(
-      (best, v) => (!best || v.difficultyLevel > best.difficultyLevel ? v : best),
-      null as (typeof allVariants)[number] | null,
-    );
-    const bestVariantLevel = bestVariant?.difficultyLevel ?? 0;
-    const bestVariantName = bestVariant?.name ?? null;
+    // Find the variant that produced bestSet (first matching set wins)
+    let bestSetVariantName: string | null = null;
+    if (bestSet > 0) {
+      for (const s of e.sets) {
+        if ((s.reps ?? s.holdSeconds ?? 0) === bestSet) {
+          bestSetVariantName = s.variant?.name ?? e.variant?.name ?? null;
+          break;
+        }
+      }
+    }
 
     if (!existing) {
       map.set(e.exerciseId, {
         exerciseId: e.exerciseId, exerciseName: e.exercise.name,
         category: e.exercise.category, isStatic: e.exercise.isStatic,
         sessions: 1, totalSets: e.sets.length, totalVolume: metric,
-        bestValue: bestSet, topVariantName: bestVariantName,
+        bestValue: bestSet, topVariantName: bestSetVariantName,
         lastPerformed: e.workout.date.toISOString(), lastDate: e.workout.date,
       });
     } else {
       existing.sessions += 1;
       existing.totalSets += e.sets.length;
       existing.totalVolume += metric;
-      existing.bestValue = Math.max(existing.bestValue, bestSet);
-      if (e.variant && bestVariantLevel > 0) {
-        const currentTopLevel = e.exercise.variants.find((v) => v.name === existing.topVariantName)?.difficultyLevel ?? 0;
-        if (bestVariantLevel > currentTopLevel) existing.topVariantName = bestVariantName;
+      if (bestSet > existing.bestValue) {
+        existing.bestValue = bestSet;
+        if (bestSetVariantName) existing.topVariantName = bestSetVariantName;
       }
       if (!existing.lastDate || e.workout.date > existing.lastDate) {
         existing.lastDate = e.workout.date;
