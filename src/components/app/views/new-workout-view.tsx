@@ -198,7 +198,7 @@ export function NewWorkoutView() {
     toast.success(`Séance « ${workout.title || "session"} » chargée pour édition.`);
   }, [editId, workoutsQ.data]);
 
-  const { title, date, exertion, bodyweight, notes, defaultRestSec, entries, sessionStartedAt } = draft;
+  const { title, date, exertion, bodyweight, notes, defaultRestSec, entries, sessionStartedAt, durationMin } = draft;
   const existingGroups = React.useMemo(() => usedSupersetGroups(entries), [entries]);
 
   function addEntry(exercise: ExerciseWithVariants) {
@@ -399,6 +399,27 @@ export function NewWorkoutView() {
                 className="tabular-nums"
               />
             </div>
+
+            {editingWorkoutId && (
+              <div className="space-y-1.5">
+                <Label htmlFor="nw-duration">Durée (min)</Label>
+                <Input
+                  id="nw-duration"
+                  type="number"
+                  min={0}
+                  value={durationMin}
+                  onChange={(e) =>
+                    draft.setMeta(
+                      "durationMin",
+                      e.target.value === "" ? "" : Number(e.target.value),
+                    )
+                  }
+                  placeholder="—"
+                  inputMode="numeric"
+                  className="tabular-nums"
+                />
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <Label htmlFor="nw-bw">Poids du corps (kg)</Label>

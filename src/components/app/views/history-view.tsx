@@ -605,11 +605,7 @@ function OverflowMenu({ workout }: { workout: WorkoutFull }) {
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => editWorkout(workout)}>
             <Pencil className="h-4 w-4" />
-            Modifier les entrées
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setEditMetaOpen(true)}>
-            <Pencil className="h-4 w-4" />
-            Modifier les infos
+            Modifier la séance
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
