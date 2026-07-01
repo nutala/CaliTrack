@@ -1063,13 +1063,9 @@ function VariantFormDialog({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="var-level">
-                Rang de difficulté{" "}
-                <span className="text-xs font-normal text-muted-foreground">
-                  (1 = le plus facile)
-                </span>
-              </Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="var-level">Rang de difficulté</Label>
+              <span className="text-[11px] text-muted-foreground leading-tight">(1 = le plus facile)</span>
               <Input
                 id="var-level"
                 type="number"
@@ -1081,16 +1077,12 @@ function VariantFormDialog({
                     e.target.value === "" ? 0 : Number(e.target.value),
                   )
                 }
-                className="tabular-nums"
+                className="tabular-nums mt-1"
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="var-target">
-                Objectif{" "}
-                <span className="text-xs font-normal text-muted-foreground">
-                  ({unit})
-                </span>
-              </Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="var-target">Objectif</Label>
+              <span className="text-[11px] text-muted-foreground leading-tight">({unit})</span>
               <Input
                 id="var-target"
                 type="number"
@@ -1102,7 +1094,7 @@ function VariantFormDialog({
                   )
                 }
                 placeholder="0 = aucun"
-                className="tabular-nums"
+                className="tabular-nums mt-1"
               />
             </div>
           </div>
