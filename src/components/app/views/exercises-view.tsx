@@ -834,7 +834,7 @@ function ExerciseFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {editing ? "Modifier l'exercice" : "Ajouter un exercice"}
@@ -1037,7 +1037,7 @@ function VariantFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {context?.variant ? "Modifier la variante" : "Ajouter une variante de progression"}
