@@ -59,6 +59,9 @@ function playBeep() {
 export function RestTimerWidget() {
   const timer = useTimerStore();
   const [now, setNow] = React.useState(Date.now());
+  /// Tracks whether the "done" event was handled during this session,
+  /// so we don't double-beep after a refresh recovery.
+  const doneHandled = React.useRef(false);
 
   // Request notification permission when the timer starts running.
   React.useEffect(() => {
@@ -84,30 +87,42 @@ export function RestTimerWidget() {
     };
   }, [timer.state]);
 
-  // Detect completion.
+  // Detect completion (live).
   React.useEffect(() => {
     if (timer.state === "running" && timer.endsAt != null) {
       const left = timer.endsAt - Date.now();
       if (left <= 0) {
-        playBeep();
-        try { navigator.vibrate?.([200, 100, 200]); } catch { /* no vibrate */ }
-        // Show system notification via service worker (works when tab is in background).
-        if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({ type: "SHOW_NOTIFICATION" });
-        } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-          try {
-            const n = new Notification("Repos terminé ! 💪", {
-              body: "C'est reparti pour une série !",
-              tag: "rest-timer",
-            });
-            setTimeout(() => n.close(), 5000);
-          } catch { /* fallback */ }
-        }
-        toast.success("Repos terminé — c'est reparti ! 💪", { duration: 4000 });
+        doneHandled.current = true;
+        beepAndNotify();
         timer.complete();
       }
     }
   }, [now, timer.state, timer.endsAt, timer]);
+
+  // Recovery after page refresh: timer was persisted as "done" during hydration.
+  React.useEffect(() => {
+    if (timer.state === "done" && !doneHandled.current) {
+      doneHandled.current = true;
+      beepAndNotify();
+    }
+  }, [timer.state]);
+
+  function beepAndNotify() {
+    playBeep();
+    try { navigator.vibrate?.([200, 100, 200]); } catch { /* no vibrate */ }
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: "SHOW_NOTIFICATION" });
+    } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      try {
+        const n = new Notification("Repos terminé ! 💪", {
+          body: "C'est reparti pour une série !",
+          tag: "rest-timer",
+        });
+        setTimeout(() => n.close(), 5000);
+      } catch { /* fallback */ }
+    }
+    toast.success("Repos terminé — c'est reparti ! 💪", { duration: 4000 });
+  }
 
   if (timer.state === "idle") return null;
 

@@ -6,6 +6,7 @@
  * clock on each tick rather than decrementing a counter).
  */
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export type TimerState = "idle" | "running" | "paused" | "done";
 
@@ -31,69 +32,90 @@ interface RestTimerStore {
   dismiss: () => void;
 }
 
-export const useTimerStore = create<RestTimerStore>((set, get) => ({
-  state: "idle",
-  endsAt: null,
-  remainingMs: null,
-  totalSec: 0,
-  label: "Rest",
-
-  start: (seconds, label) =>
-    set({
-      state: "running",
-      endsAt: Date.now() + seconds * 1000,
-      remainingMs: null,
-      totalSec: seconds,
-      label: label ?? "Rest",
-    }),
-
-  pause: () => {
-    const { endsAt, state } = get();
-    if (state !== "running" || endsAt == null) return;
-    const rem = Math.max(0, endsAt - Date.now());
-    set({ state: "paused", remainingMs: rem, endsAt: null });
-  },
-
-  resume: () => {
-    const { remainingMs, state } = get();
-    if (state !== "paused" || remainingMs == null) return;
-    set({
-      state: "running",
-      endsAt: Date.now() + remainingMs,
-      remainingMs: null,
-    });
-  },
-
-  skip: () =>
-    set({
+export const useTimerStore = create<RestTimerStore>()(
+  persist(
+    (set, get) => ({
       state: "idle",
       endsAt: null,
       remainingMs: null,
       totalSec: 0,
+      label: "Rest",
+
+      start: (seconds, label) =>
+        set({
+          state: "running",
+          endsAt: Date.now() + seconds * 1000,
+          remainingMs: null,
+          totalSec: seconds,
+          label: label ?? "Rest",
+        }),
+
+      pause: () => {
+        const { endsAt, state } = get();
+        if (state !== "running" || endsAt == null) return;
+        const rem = Math.max(0, endsAt - Date.now());
+        set({ state: "paused", remainingMs: rem, endsAt: null });
+      },
+
+      resume: () => {
+        const { remainingMs, state } = get();
+        if (state !== "paused" || remainingMs == null) return;
+        set({
+          state: "running",
+          endsAt: Date.now() + remainingMs,
+          remainingMs: null,
+        });
+      },
+
+      skip: () =>
+        set({
+          state: "idle",
+          endsAt: null,
+          remainingMs: null,
+          totalSec: 0,
+        }),
+
+      addTime: (seconds) => {
+        const { state, endsAt, remainingMs } = get();
+        if (state === "running" && endsAt != null) {
+          set({ endsAt: endsAt + seconds * 1000, totalSec: get().totalSec + seconds });
+        } else if (state === "paused" && remainingMs != null) {
+          set({
+            remainingMs: remainingMs + seconds * 1000,
+            totalSec: get().totalSec + seconds,
+          });
+        }
+      },
+
+      complete: () => set({ state: "done", endsAt: null, remainingMs: null }),
+
+      dismiss: () =>
+        set({
+          state: "idle",
+          endsAt: null,
+          remainingMs: null,
+          totalSec: 0,
+        }),
     }),
-
-  addTime: (seconds) => {
-    const { state, endsAt, remainingMs } = get();
-    if (state === "running" && endsAt != null) {
-      set({ endsAt: endsAt + seconds * 1000, totalSec: get().totalSec + seconds });
-    } else if (state === "paused" && remainingMs != null) {
-      set({
-        remainingMs: remainingMs + seconds * 1000,
-        totalSec: get().totalSec + seconds,
-      });
-    }
-  },
-
-  complete: () => set({ state: "done", endsAt: null, remainingMs: null }),
-
-  dismiss: () =>
-    set({
-      state: "idle",
-      endsAt: null,
-      remainingMs: null,
-      totalSec: 0,
-    }),
-}));
+    {
+      name: "calitrack-rest-timer",
+      partialize: (state) => ({
+        state: state.state,
+        endsAt: state.endsAt,
+        remainingMs: state.remainingMs,
+        totalSec: state.totalSec,
+        label: state.label,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        // If the timer ended while the page was closed, mark it done.
+        if (state.state === "running" && state.endsAt != null && state.endsAt <= Date.now()) {
+          useTimerStore.setState({ state: "done", endsAt: null, remainingMs: null });
+        }
+      },
+    },
+  ),
+);
 
 /** Preset rest durations offered in the UI (seconds). */
 export const REST_PRESETS = [
