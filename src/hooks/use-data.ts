@@ -245,6 +245,7 @@ export function useUpdateWorkoutEntries() {
       qc.invalidateQueries({ queryKey: qk.overview });
       qc.invalidateQueries({ queryKey: qk.topExercises });
       qc.invalidateQueries({ queryKey: ["stats", "progress"] });
+      qc.invalidateQueries({ queryKey: ["exercises"] });
       toast.success("Séance mise à jour 🎉");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -259,6 +260,8 @@ export function useDeleteWorkout() {
       qc.invalidateQueries({ queryKey: qk.workouts });
       qc.invalidateQueries({ queryKey: qk.overview });
       qc.invalidateQueries({ queryKey: qk.topExercises });
+      qc.invalidateQueries({ queryKey: ["stats", "progress"] });
+      qc.invalidateQueries({ queryKey: ["exercises"] });
       toast.success("Séance supprimée");
     },
     onError: (e: Error) => toast.error(e.message),
