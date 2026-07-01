@@ -61,6 +61,8 @@ export interface ProgressPoint {
   totalVolume: number;
   setsCount: number;
   rpe: number | null;
+  /// Unit derived from the actual set data ("reps" or "s")
+  unit: string;
 }
 
 export interface OverviewStats {

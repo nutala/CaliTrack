@@ -29,17 +29,30 @@ export async function GET(req: Request) {
     take: limit,
   });
 
-  const points: ProgressPoint[] = entries.reverse().map((e) => ({
-    date: format(e.workout.date, "yyyy-MM-dd"),
-    workoutId: e.workoutId,
-    bestValue: Math.max(...e.sets.map((s) => s.reps ?? s.holdSeconds ?? 0)),
-    totalVolume: e.sets.reduce((acc, s) => acc + (s.reps ?? s.holdSeconds ?? 0), 0),
-    setsCount: e.sets.length,
-    rpe: (() => {
-      const rpes = e.sets.map((s) => s.rpe).filter((v): v is number => v != null);
-      return rpes.length ? Math.max(...rpes) : null;
-    })(),
-  }));
+  const points: ProgressPoint[] = entries.reverse().map((e) => {
+    const sets = e.sets;
+    const bestSet = sets.reduce((best, s) => {
+      const val = s.reps ?? s.holdSeconds ?? 0;
+      const bestVal = best.reps ?? best.holdSeconds ?? 0;
+      return val > bestVal ? s : best;
+    }, sets[0]);
+    const unit =
+      bestSet && bestSet.holdSeconds != null && (bestSet.reps == null || bestSet.reps === 0)
+        ? "s"
+        : "reps";
+    return {
+      date: format(e.workout.date, "yyyy-MM-dd"),
+      workoutId: e.workoutId,
+      bestValue: Math.max(...sets.map((s) => s.reps ?? s.holdSeconds ?? 0)),
+      totalVolume: sets.reduce((acc, s) => acc + (s.reps ?? s.holdSeconds ?? 0), 0),
+      setsCount: sets.length,
+      rpe: (() => {
+        const rpes = sets.map((s) => s.rpe).filter((v): v is number => v != null);
+        return rpes.length ? Math.max(...rpes) : null;
+      })(),
+      unit,
+    };
+  });
 
   return NextResponse.json({ exercise, points });
 }

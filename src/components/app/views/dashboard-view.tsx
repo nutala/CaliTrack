@@ -303,15 +303,17 @@ function ProgressTracker() {
   const mergedData = useMemo(() => {
     const p1 = points1 ?? [];
     const p2 = points2 ?? [];
-    const byDate = new Map<string, { ex1?: number; ex2?: number }>();
+    const byDate = new Map<string, { ex1Val?: number; ex1Unit?: string; ex2Val?: number; ex2Unit?: string }>();
     for (const p of p1) {
       const entry = byDate.get(p.date) ?? {};
-      entry.ex1 = p.bestValue;
+      entry.ex1Val = p.bestValue;
+      entry.ex1Unit = p.unit;
       byDate.set(p.date, entry);
     }
     for (const p of p2) {
       const entry = byDate.get(p.date) ?? {};
-      entry.ex2 = p.bestValue;
+      entry.ex2Val = p.bestValue;
+      entry.ex2Unit = p.unit;
       byDate.set(p.date, entry);
     }
     return Array.from(byDate.entries())
@@ -340,10 +342,12 @@ function ProgressTracker() {
   const tooltipFormatter: React.ComponentProps<
     typeof ChartTooltip
   >["formatter"] = (value, _name, item) => {
-    const key = (item?.dataKey as string) ?? "ex1";
-    const ex = key === "ex2" ? ex2 : ex1;
-    const unit = metricUnit(ex?.isStatic ?? false);
-    const color = key === "ex2" ? "var(--chart-2)" : "var(--chart-1)";
+    const key = (item?.dataKey as string) ?? "ex1Val";
+    const isEx2 = key === "ex2Val";
+    const ex = isEx2 ? ex2 : ex1;
+    const pt = item?.payload as Record<string, unknown> | undefined;
+    const unit = isEx2 ? (pt?.ex2Unit as string) : (pt?.ex1Unit as string);
+    const color = isEx2 ? "var(--chart-2)" : "var(--chart-1)";
     return (
       <div className="flex w-full items-center gap-2">
         <span
@@ -353,7 +357,7 @@ function ProgressTracker() {
         <span className="text-muted-foreground">{ex?.name ?? key}</span>
         <span className="ml-auto font-mono font-medium tabular-nums text-foreground">
           {Number(value).toLocaleString()}
-          <span className="ml-1 font-sans text-muted-foreground">{unit}</span>
+          {unit && <span className="ml-1 font-sans text-muted-foreground">{unit}</span>}
         </span>
       </div>
     );
@@ -504,7 +508,7 @@ function ProgressTracker() {
               />
               <Line
                 type="monotone"
-                dataKey="ex1"
+                dataKey="ex1Val"
                 stroke="var(--color-ex1)"
                 strokeWidth={2}
                 dot={{ r: 3, fill: "var(--color-ex1)", strokeWidth: 0 }}
@@ -514,7 +518,7 @@ function ProgressTracker() {
               {hasEx2 && (
                 <Line
                   type="monotone"
-                  dataKey="ex2"
+                  dataKey="ex2Val"
                   stroke="var(--color-ex2)"
                   strokeWidth={2}
                   strokeDasharray="4 3"
