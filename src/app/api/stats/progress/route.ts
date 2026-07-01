@@ -51,7 +51,7 @@ export async function GET(req: Request) {
           ? "s"
           : "reps";
       return {
-        date: e.workout.date.toISOString().slice(0, 10),
+        date: e.workout.date.toISOString(),
         workoutId: e.workoutId,
         bestValue: Math.max(...sets.map((s) => s.reps ?? s.holdSeconds ?? 0)),
         totalVolume: sets.reduce((acc, s) => acc + (s.reps ?? s.holdSeconds ?? 0), 0),

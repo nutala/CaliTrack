@@ -847,7 +847,7 @@ function EditDialog({
     e.preventDefault();
     const body: Record<string, unknown> = {
       title: title.trim() || null,
-      date: dateStr ? new Date(`${dateStr}T00:00:00`).toISOString() : undefined,
+      date: dateStr ? new Date(`${dateStr}T00:00:00Z`).toISOString() : undefined,
       durationMin: durationMin === "" ? null : Number(durationMin),
       perceivedExertion: pe,
       bodyweightKg: bodyweightKg === "" ? null : Number(bodyweightKg),

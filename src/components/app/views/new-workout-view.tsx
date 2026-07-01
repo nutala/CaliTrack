@@ -301,7 +301,7 @@ export function NewWorkoutView() {
     }
 
     // Build ISO date at local midnight
-    const isoDate = new Date(`${date}T00:00:00`).toISOString();
+    const isoDate = new Date(`${date}T00:00:00Z`).toISOString();
 
     const payload: NewWorkoutPayload = {
       date: isoDate,

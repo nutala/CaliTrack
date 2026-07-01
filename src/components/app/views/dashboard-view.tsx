@@ -308,18 +308,20 @@ function ProgressTracker() {
       ex2Val?: number; ex2Unit?: string; ex2Variant?: string | null;
     }>();
     for (const p of p1) {
-      const entry = byDate.get(p.date) ?? {};
+      const localDate = format(parseISO(p.date), "yyyy-MM-dd");
+      const entry = byDate.get(localDate) ?? {};
       entry.ex1Val = p.bestValue;
       entry.ex1Unit = p.unit;
       entry.ex1Variant = p.variantName;
-      byDate.set(p.date, entry);
+      byDate.set(localDate, entry);
     }
     for (const p of p2) {
-      const entry = byDate.get(p.date) ?? {};
+      const localDate = format(parseISO(p.date), "yyyy-MM-dd");
+      const entry = byDate.get(localDate) ?? {};
       entry.ex2Val = p.bestValue;
       entry.ex2Unit = p.unit;
       entry.ex2Variant = p.variantName;
-      byDate.set(p.date, entry);
+      byDate.set(localDate, entry);
     }
     return Array.from(byDate.entries())
       .map(([date, v]) => ({ date, ...v }))
@@ -479,7 +481,9 @@ function ProgressTracker() {
                 minTickGap={24}
                 tickFormatter={(d: string) => {
                   try {
-                    return format(parseISO(d), "dd MMM");
+                    const [, m, day] = d.split("-");
+                    const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
+                    return `${parseInt(day)} ${months[parseInt(m) - 1]}`;
                   } catch {
                     return d;
                   }
@@ -502,9 +506,11 @@ function ProgressTracker() {
                         | undefined;
                       if (!dateStr) return null;
                       try {
+                        const [y, m, day] = dateStr.split("-");
+                        const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
                         return (
                           <div className="font-medium">
-                            {format(parseISO(dateStr), "dd MMM yyyy")}
+                            {parseInt(day)} {months[parseInt(m) - 1]} {y}
                           </div>
                         );
                       } catch {
