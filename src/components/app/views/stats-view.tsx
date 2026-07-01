@@ -523,7 +523,7 @@ export function StatsView() {
                       <TableHead>Catégorie</TableHead>
                       <TableHead className="text-right">Séances</TableHead>
                       <TableHead className="text-right">Meilleure série</TableHead>
-                      <TableHead>Variante max</TableHead>
+                      <TableHead>Variante</TableHead>
                       <TableHead className="text-right">
                         Dernière fois
                       </TableHead>

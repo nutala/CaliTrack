@@ -658,7 +658,7 @@ function TopExercises() {
 
                     <div className="space-y-1 border-t border-border/60 pt-2 text-xs">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-muted-foreground">Variante max</span>
+                        <span className="text-muted-foreground">Variante</span>
                         <span className="truncate font-medium text-foreground">
                           {te.topVariantName ?? "—"}
                         </span>
