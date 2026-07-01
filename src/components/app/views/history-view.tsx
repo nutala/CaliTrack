@@ -579,9 +579,10 @@ function Chip({
 /* ------------------------------------------------------------------ */
 
 function OverflowMenu({ workout }: { workout: WorkoutFull }) {
-  const [editOpen, setEditOpen] = React.useState(false);
+  const [editMetaOpen, setEditMetaOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const repeatWorkout = useAppStore((s) => s.repeatWorkout);
+  const editWorkout = useAppStore((s) => s.editWorkout);
 
   return (
     <>
@@ -602,9 +603,13 @@ function OverflowMenu({ workout }: { workout: WorkoutFull }) {
             <RefreshCw className="h-4 w-4" />
             Refaire la séance
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+          <DropdownMenuItem onSelect={() => editWorkout(workout)}>
             <Pencil className="h-4 w-4" />
-            Modifier
+            Modifier les entrées
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setEditMetaOpen(true)}>
+            <Pencil className="h-4 w-4" />
+            Modifier les infos
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -619,8 +624,8 @@ function OverflowMenu({ workout }: { workout: WorkoutFull }) {
 
       <EditDialog
         workout={workout}
-        open={editOpen}
-        onOpenChange={setEditOpen}
+        open={editMetaOpen}
+        onOpenChange={setEditMetaOpen}
       />
       <DeleteDialog
         workoutId={workout.id}

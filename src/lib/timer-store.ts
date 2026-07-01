@@ -20,6 +20,8 @@ interface RestTimerStore {
   totalSec: number;
   /// Label shown in the widget (e.g. "Rest" or "Superset rest").
   label: string;
+  /// Last custom rest duration entered by the user (persisted).
+  lastCustomRestSec: number;
 
   start: (seconds: number, label?: string) => void;
   pause: () => void;
@@ -30,6 +32,7 @@ interface RestTimerStore {
   complete: () => void;
   /// Dismiss the "done" banner and return to idle.
   dismiss: () => void;
+  setLastCustomRestSec: (sec: number) => void;
 }
 
 export const useTimerStore = create<RestTimerStore>()(
@@ -40,6 +43,7 @@ export const useTimerStore = create<RestTimerStore>()(
       remainingMs: null,
       totalSec: 0,
       label: "Rest",
+      lastCustomRestSec: 90,
 
       start: (seconds, label) =>
         set({
@@ -96,6 +100,8 @@ export const useTimerStore = create<RestTimerStore>()(
           remainingMs: null,
           totalSec: 0,
         }),
+
+      setLastCustomRestSec: (sec) => set({ lastCustomRestSec: sec }),
     }),
     {
       name: "calitrack-rest-timer",
@@ -105,6 +111,7 @@ export const useTimerStore = create<RestTimerStore>()(
         remainingMs: state.remainingMs,
         totalSec: state.totalSec,
         label: state.label,
+        lastCustomRestSec: state.lastCustomRestSec,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;

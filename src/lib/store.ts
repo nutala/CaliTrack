@@ -21,6 +21,10 @@ interface AppState {
   repeatWorkout: (w: WorkoutFull) => void;
   consumeRepeat: () => string | null;
 
+  editWorkoutId: string | null;
+  editWorkout: (w: WorkoutFull) => void;
+  consumeEdit: () => string | null;
+
   exerciseDetailId: string | null;
   viewExerciseDetail: (id: string) => void;
 
@@ -40,6 +44,15 @@ export const useAppStore = create<AppState>((set) => ({
   consumeRepeat: () => {
     const id = useAppStore.getState().repeatWorkoutId;
     if (id) set({ repeatWorkoutId: null });
+    return id;
+  },
+
+  editWorkoutId: null,
+  editWorkout: (w) =>
+    set({ editWorkoutId: w.id, view: "new-workout" }),
+  consumeEdit: () => {
+    const id = useAppStore.getState().editWorkoutId;
+    if (id) set({ editWorkoutId: null });
     return id;
   },
 

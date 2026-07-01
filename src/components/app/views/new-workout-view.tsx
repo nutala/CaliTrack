@@ -33,6 +33,7 @@ import { metricUnit, fmtCompact, supersetLabel, supersetColor, difficultyStars }
 import {
   useExercises,
   useCreateWorkout,
+  useUpdateWorkoutEntries,
   useWorkouts,
   useCategoryMeta,
   useTemplates,
@@ -149,6 +150,7 @@ export function NewWorkoutView() {
   const exercises = exercisesQ.data ?? [];
   const workoutsQ = useWorkouts();
   const createWorkout = useCreateWorkout();
+  const updateWorkoutEntries = useUpdateWorkoutEntries();
 
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [cancelOpen, setCancelOpen] = React.useState(false);
@@ -182,6 +184,23 @@ export function NewWorkoutView() {
     draft.loadFromWorkout(workout, exerciseMap);
     toast.success(`Séance « ${workout.title || "session"} » chargée — ajuste puis enregistre.`);
   }, [repeatId, workoutsQ.data]);
+
+  // ----- Consume "Edit workout" prefill on mount -----
+  const editId = useAppStore((s) => s.editWorkoutId);
+  const consumeEdit = useAppStore((s) => s.consumeEdit);
+  const [editingWorkoutId, setEditingWorkoutId] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    const id = consumeEdit();
+    if (!id) return;
+    const workout = workoutsQ.data?.find((w) => w.id === id);
+    if (!workout) {
+      toast.info("Données de la séance encore en cours de chargement — réessaie dans un instant.");
+      return;
+    }
+    draft.loadFromWorkout(workout, exerciseMap);
+    setEditingWorkoutId(id);
+    toast.success(`Séance « ${workout.title || "session"} » chargée pour édition.`);
+  }, [editId, workoutsQ.data]);
 
   const { title, date, exertion, bodyweight, notes, defaultRestSec, entries, sessionStartedAt } = draft;
   const existingGroups = React.useMemo(() => usedSupersetGroups(entries), [entries]);
@@ -327,12 +346,17 @@ export function NewWorkoutView() {
       }),
     };
 
-    createWorkout.mutate(payload, {
-      onSuccess: () => {
-        draft.resetDraft();
-        useAppStore.getState().setView("history");
-      },
-    });
+    const onSuccess = () => {
+      draft.resetDraft();
+      setEditingWorkoutId(null);
+      useAppStore.getState().setView("history");
+    };
+
+    if (editingWorkoutId) {
+      updateWorkoutEntries.mutate({ id: editingWorkoutId, body: payload }, { onSuccess });
+    } else {
+      createWorkout.mutate(payload, { onSuccess });
+    }
   }
 
   function handleCancel() {
@@ -600,7 +624,7 @@ export function NewWorkoutView() {
             <Button
               variant="outline"
               onClick={() => setCancelOpen(true)}
-              disabled={createWorkout.isPending}
+              disabled={createWorkout.isPending || updateWorkoutEntries.isPending}
               className="text-destructive hover:text-destructive"
             >
               <X className="h-4 w-4" />
@@ -608,10 +632,10 @@ export function NewWorkoutView() {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={createWorkout.isPending}
+              disabled={createWorkout.isPending || updateWorkoutEntries.isPending}
               className="sm:min-w-44"
             >
-              {createWorkout.isPending ? (
+              {createWorkout.isPending || updateWorkoutEntries.isPending ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   Enregistrement…
@@ -619,7 +643,7 @@ export function NewWorkoutView() {
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  Enregistrer la séance
+                  {editingWorkoutId ? "Mettre à jour la séance" : "Enregistrer la séance"}
                 </>
               )}
             </Button>

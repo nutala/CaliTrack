@@ -230,6 +230,27 @@ export function useUpdateWorkout() {
   });
 }
 
+export function useUpdateWorkoutEntries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: NewWorkoutPayload;
+    }) => api.put<WorkoutFull>(`/api/workouts/${id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.workouts });
+      qc.invalidateQueries({ queryKey: qk.overview });
+      qc.invalidateQueries({ queryKey: qk.topExercises });
+      qc.invalidateQueries({ queryKey: ["stats", "progress"] });
+      toast.success("Séance mise à jour 🎉");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 export function useDeleteWorkout() {
   const qc = useQueryClient();
   return useMutation({
