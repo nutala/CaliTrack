@@ -174,13 +174,11 @@ export function NewWorkoutView() {
   const repeatId = useAppStore((s) => s.repeatWorkoutId);
   const consumeRepeat = useAppStore((s) => s.consumeRepeat);
   React.useEffect(() => {
+    if (!workoutsQ.data) return;
     const id = consumeRepeat();
     if (!id) return;
-    const workout = workoutsQ.data?.find((w) => w.id === id);
-    if (!workout) {
-      toast.info("Données de la séance encore en cours de chargement — réessaie dans un instant.");
-      return;
-    }
+    const workout = workoutsQ.data.find((w) => w.id === id);
+    if (!workout) return;
     draft.loadFromWorkout(workout, exerciseMap);
     toast.success(`Séance « ${workout.title || "session"} » chargée — ajuste puis enregistre.`);
   }, [repeatId, workoutsQ.data]);
@@ -190,13 +188,11 @@ export function NewWorkoutView() {
   const consumeEdit = useAppStore((s) => s.consumeEdit);
   const [editingWorkoutId, setEditingWorkoutId] = React.useState<string | null>(null);
   React.useEffect(() => {
+    if (!workoutsQ.data) return;
     const id = consumeEdit();
     if (!id) return;
-    const workout = workoutsQ.data?.find((w) => w.id === id);
-    if (!workout) {
-      toast.info("Données de la séance encore en cours de chargement — réessaie dans un instant.");
-      return;
-    }
+    const workout = workoutsQ.data.find((w) => w.id === id);
+    if (!workout) return;
     draft.loadFromWorkout(workout, exerciseMap);
     setEditingWorkoutId(id);
     toast.success(`Séance « ${workout.title || "session"} » chargée pour édition.`);
