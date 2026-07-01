@@ -21,19 +21,34 @@ function toMmSs(sec: number): string {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+/** Auto-format raw keystrokes into mm:ss display. */
+function formatInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 0) return "00:00";
+  const padded = digits.padStart(3, "0");
+  const mm = padded.slice(0, -2);
+  const ss = padded.slice(-2);
+  return `${mm.padStart(2, "0")}:${ss}`;
+}
+
 function parseMmSs(value: string): number | null {
   const cleaned = value.replace(/[^0-9:]/g, "");
-  const parts = cleaned.split(":");
-  if (parts.length === 2) {
+  if (cleaned.includes(":")) {
+    const parts = cleaned.split(":");
     const mm = parseInt(parts[0], 10);
     const ss = parseInt(parts[1], 10);
     if (!isNaN(mm) && !isNaN(ss) && ss < 60) return mm * 60 + ss;
+    return null;
   }
-  if (parts.length === 1) {
-    const sec = parseInt(parts[0], 10);
-    if (!isNaN(sec)) return sec;
+  // Pure digits — interpret as mmss (last 2 = seconds, rest = minutes)
+  if (cleaned.length < 2) {
+    const sec = parseInt(cleaned, 10);
+    return !isNaN(sec) ? sec : null;
   }
-  return null;
+  const mm = parseInt(cleaned.slice(0, -2), 10);
+  const ss = parseInt(cleaned.slice(-2), 10);
+  if (!isNaN(mm) && !isNaN(ss) && ss < 60) return mm * 60 + ss;
+  return parseInt(cleaned, 10) || null;
 }
 
 export function CustomRestTrigger() {
@@ -80,9 +95,10 @@ export function CustomRestTrigger() {
           <div className="space-y-4">
             <Input
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => setInput(formatInput(e.target.value))}
               placeholder="01:30"
               className="text-center text-lg tabular-nums"
+              inputMode="numeric"
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSubmit();
               }}
