@@ -860,7 +860,11 @@ function EntryCard({
   const inSuperset = supersetGroup != null;
 
   async function handleAddSet() {
-    const lastSet = sets[sets.length - 1];
+    // Read latest entry from store (not closure) to avoid race conditions
+    // when handleVariantChange (async) hasn't resolved yet.
+    const latest = useDraftStore.getState().entries.find((e) => e.id === entry.id);
+    const latestSets = latest?.sets ?? sets;
+    const lastSet = latestSets[latestSets.length - 1];
     const defaults: Partial<DraftSet> = {};
     const variantId = lastSet?.variantId ?? (sortedVariants.length > 0 ? sortedVariants[0].id : undefined);
     if (variantId) defaults.variantId = variantId;
